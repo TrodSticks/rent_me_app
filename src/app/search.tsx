@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LogoMark } from '@/components/logo';
@@ -9,6 +9,7 @@ import { PropertyCard } from '@/components/property-card';
 import { Colors, Fonts, Radius } from '@/constants/theme';
 import { SAMPLE_PROPERTIES, type PropertyType } from '@/data/properties';
 import { describeSteps, search } from '@/lib/search';
+import { smartSearch, type SmartSearchResult } from '@/lib/smart-search';
 import { useSession } from '@/lib/session';
 
 const FILTERS: { label: string; type: PropertyType | null }[] = [
@@ -25,7 +26,23 @@ export default function SearchResults() {
   const { savedIds, toggleSaved } = useSession();
   const [filter, setFilter] = useState<PropertyType | null>(null);
 
-  const { params, results } = useMemo(() => search(SAMPLE_PROPERTIES, q), [q]);
+  // Show the instant rules result straight away; upgrade it if the LLM backup helps.
+  const rules = useMemo(() => search(SAMPLE_PROPERTIES, q), [q]);
+  const [smart, setSmart] = useState<{ q: string; result: SmartSearchResult } | null>(null);
+  const thinking = smart?.q !== q;
+
+  useEffect(() => {
+    let cancelled = false;
+    smartSearch(SAMPLE_PROPERTIES, q).then((result) => {
+      if (!cancelled) setSmart({ q, result });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [q]);
+
+  const result = !thinking && smart ? smart.result : rules;
+  const { params, results } = result;
   const steps = describeSteps(params);
   const shown = filter ? results.filter((p) => p.type === filter) : results;
 
@@ -40,6 +57,7 @@ export default function SearchResults() {
       <View style={styles.searching}>
         <LogoMark size={30} />
         <Text style={styles.searchingTitle}>Searching for you…</Text>
+        {thinking && <ActivityIndicator size="small" color={Colors.primary} />}
       </View>
       <View style={styles.steps}>
         {steps.map((s) => (

@@ -33,6 +33,27 @@ Checks: `npx expo lint` and `npx tsc --noEmit`.
 | `scripts/generate-icons.mjs` | Renders the app icon / splash PNGs from the logo |
 | `legacy-flask/` | The original Flask prototype, kept for reference |
 
+## Smart search (rules first, LLM as backup)
+
+1. **Rules** (`src/lib/search.ts`) understand English, common Setswana, number words
+   ("two", "pedi"), nicknames ("gabs"), small typos ("bedrom hous") and price styles
+   ("5k", "4 and a half", "not more than 3500"). Instant, offline, free.
+2. If some words are not understood, the app asks the **`parse-search` Edge Function**
+   (`supabase/functions/parse-search`), which calls an open-source LLM through any
+   OpenAI-compatible API. The answer is validated (`src/lib/search-llm.ts`) and merged;
+   if it fails or takes over 4 s, the rules' result is used.
+
+**Measure it:** `npm run eval:search` scores the test sentences in `eval/search-cases.ts`
+(English, Setswana, mixed, plus a held-out set). Set `LLM_BASE_URL` / `LLM_MODEL`
+(see `.env.example`) to also score the LLM on its own and the combined search.
+
+**Deploy the LLM backup** (once Supabase is set up):
+
+```bash
+npx supabase secrets set LLM_BASE_URL=... LLM_MODEL=... LLM_API_KEY=...
+npx supabase functions deploy parse-search
+```
+
 ## Accounts
 
 Sign-up offers three roles: **Renter**, **Landlord** and **Agent** (agents also give
@@ -44,6 +65,7 @@ their agency name). Landlords and agents get the same listing tools.
 - [x] Welcome, sign up, sign up with email, sign in
 - [x] Home with plain-language search, suggestions and featured listings
 - [x] Search results with filters
+- [x] Smart search: better rules + LLM backup + test set (LLM goes live with Supabase)
 - [ ] Supabase backend (real accounts, listings, photos)
 - [ ] Property details, map view, saved, messages, book a viewing, profile
 - [ ] Landlord dashboard and add property

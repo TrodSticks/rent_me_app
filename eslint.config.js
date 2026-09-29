@@ -5,6 +5,6 @@ const expoConfig = require('eslint-config-expo/flat');
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ['dist/*', 'legacy-flask/*', 'scripts/*'],
+    ignores: ['dist/*', 'legacy-flask/*', 'scripts/*', 'supabase/functions/parse-search/*'],
   },
 ]);

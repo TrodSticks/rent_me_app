@@ -35,6 +35,7 @@
   "devDependencies": {
     "@types/react": "~19.2.2",
     "eslint": "^9.39.5",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -42,7 +43,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "eval:search": "tsx eval/run-search-eval.ts"
   },
   "private": true
 }
