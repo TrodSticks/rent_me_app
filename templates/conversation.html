@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block content %}
+    <div class="row">
+        <div class="col-12">
+            <!-- Conversation Header -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0">
+                                <i class="fas fa-comments me-2"></i>
+                                Conversation with {{ other_user.username }}
+                            </h5>
+                            <small class="text-light">
+                                <i class="fas fa-user me-1"></i>{{ other_user.role }}
+                                {% if property %}
+                                    <span class="ms-2">
+                                        <i class="fas fa-home me-1"></i>About:
+                                        <a href="{{ url_for('main.property_detail', property_id=property.id) }}" class="text-light fw-semibold">{{ property.title }}</a>
+                                        (P{{ property.price }}/month, {{ property.location }})
+                                    </span>
+                                {% endif %}
+                            </small>
+                        </div>
+                        <div>
+                            <a href="{{ url_for('main.inbox') }}" class="btn btn-light btn-sm">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Inbox
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messages Container -->
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="chat-container" style="height: 500px; overflow-y: auto;">
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="message-bubble {{ 'sent' if message.sender == current_user else 'received' }} p-3 m-3">
+                                    <div class="message-content">
+                                        <div class="message-text">
+                                            {{ message.content }}
+                                        </div>
+                                        <div class="message-meta">
+                                            <small class="text-muted">
+                                                <i class="fas fa-clock me-1"></i>
+                                                {{ message.timestamp.strftime('%Y-%m-%d %H:%M') }}
+                                                {% if message.sender == current_user %}
+                                                    <i class="fas fa-check ms-2 {{ 'text-primary' if message.read else 'text-muted' }}"></i>
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center py-5">
+                                <i class="fas fa-comments fa-3x text-muted mb-3"></i>
+                                <h5>No messages yet</h5>
+                                <p class="text-muted">Start the conversation by sending a message below.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Message Input -->
+                <div class="card-footer">
+                    <form method="POST" action="{{ url_for('main.send_reply', recipient_id=other_user.id) }}" class="d-flex gap-2">
+                        {% if property %}<input type="hidden" name="property_id" value="{{ property.id }}">{% endif %}
+                        <div class="flex-grow-1">
+                            <textarea class="form-control" 
+                                      name="content" 
+                                      rows="2" 
+                                      placeholder="Type your message here..." 
+                                      required
+                                      style="resize: none;"></textarea>
+                        </div>
+                        <div class="align-self-end">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane"></i>
+                                <span class="d-none d-md-inline ms-1">Send</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-scroll to bottom of chat
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatContainer = document.querySelector('.chat-container');
+            if (chatContainer) {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+            
+            // Auto-resize textarea
+            const textarea = document.querySelector('textarea[name="content"]');
+            if (textarea) {
+                textarea.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+                });
+                
+                // Submit on Ctrl+Enter
+                textarea.addEventListener('keydown', function(e) {
+                    if (e.ctrlKey && e.key === 'Enter') {
+                        e.preventDefault();
+                        this.closest('form').submit();
+                    }
+                });
+            }
+        });
+    </script>
+{% endblock %}
+

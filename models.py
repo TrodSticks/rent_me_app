@@ -15,8 +15,9 @@ class User(db.Model, UserMixin):
     role = db.Column(db.String(10), nullable=False) # 'Renter' or 'Landlord'
     properties = db.relationship('Property', backref='landlord', lazy=True)
     messages_sent = db.relationship('Message', foreign_keys='Message.sender_id', backref='sender', lazy=True)
-    messages_received = db.relationship('Message', foreign_keys='Message.recipient_id', backref='recipient', lazy=True)
-    favorites = db.relationship('Favorite', backref='user', lazy=True)
+    # 'dynamic' so templates can call .filter_by() on these
+    messages_received = db.relationship('Message', foreign_keys='Message.recipient_id', backref='recipient', lazy='dynamic')
+    favorites = db.relationship('Favorite', backref='user', lazy='dynamic')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -50,6 +51,7 @@ class Message(db.Model):
     content = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     read = db.Column(db.Boolean, default=False)
+    property = db.relationship('Property', backref='messages')
 
     def __repr__(self):
         return f"Message('{self.sender_id}', '{self.recipient_id}', '{self.timestamp}')"

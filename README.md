@@ -13,15 +13,19 @@ A full-stack web application for property rentals in Botswana, featuring AI-powe
 - **Responsive Design**: Modern, mobile-friendly interface
 
 ### For Landlords
-- Dashboard with property statistics
-- Add, edit, and delete property listings
+- Dashboard with property statistics and a message count per listing
+- Add, edit, and delete property listings, with photo upload (JPG, PNG, GIF, WebP up to 5 MB)
 - Manage property details (type, location, bedrooms, price)
-- Receive and respond to messages from potential renters
+- Receive and respond to messages, grouped by property, with an inbox filter per listing
 
 ### For Renters
 - Browse all available properties
+- Filter by type, town, bedrooms and price range, and sort by price or newest
 - AI-powered search with natural language queries
 - Save favorite properties
+
+### For Everyone
+- Account page to edit your username and email, change your password, and see recent conversations
 - View detailed property information
 - Contact landlords directly through messaging system
 
@@ -52,17 +56,23 @@ A full-stack web application for property rentals in Botswana, featuring AI-powe
    pip install -r requirements.txt
    ```
 
-3. **Create sample data (optional)**
+3. **AI search model (optional, currently off by default)**
+   ```bash
+   python download_model.py
+   ```
+   This saves [LiquidAI/LFM2.5-350M](https://huggingface.co/LiquidAI/LFM2.5-350M) (~700 MB) into `LFM2.5-350M/`. Set `USE_LLM_SEARCH=1` to turn it on. Without it, search uses the rule-based parser only.
+
+4. **Create sample data (optional)**
    ```bash
    python create_sample_data.py
    ```
 
-4. **Run the application**
+5. **Run the application**
    ```bash
    python app.py
    ```
 
-5. **Access the application**
+6. **Access the application**
    Open your browser and go to `http://localhost:5000`
 
 ## Demo Accounts
@@ -102,10 +112,14 @@ rent_me_app/
 ├── models.py             # Database models
 ├── routes.py             # Application routes
 ├── search_engine.py      # AI search functionality
+├── llm_parser.py         # Optional LLM search parser (off by default)
+├── download_model.py     # Downloads the optional LLM model
 ├── create_sample_data.py # Sample data generator
 ├── requirements.txt      # Python dependencies
+├── tests/                # Pytest test suite
 ├── templates/            # HTML templates
 │   ├── base.html
+│   ├── account.html
 │   ├── home.html
 │   ├── login.html
 │   ├── register.html

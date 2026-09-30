@@ -4,3 +4,8 @@ __pycache__/
 .env
 venv/
 .venv/
+LFM2.5-350M/
+static/property_pics/*
+!static/property_pics/default.jpg
+.pytest_cache/
+.claude/

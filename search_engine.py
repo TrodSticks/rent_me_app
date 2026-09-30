@@ -1,23 +1,32 @@
-import spacy
 import re
 from typing import Dict, List, Optional, Any
 
+try:
+    import spacy
+except ImportError:
+    spacy = None
+
+# Towns in Botswana, shared by search, filters and the property form
+LOCATIONS = [
+    'Gaborone', 'Phakalane', 'Francistown', 'Maun', 'Kasane',
+    'Serowe', 'Molepolole', 'Kanye', 'Mochudi', 'Lobatse',
+    'Palapye', 'Jwaneng', 'Ghanzi', 'Tsabong', 'Letlhakane'
+]
+
 class PropertySearchEngine:
     """AI-powered property search engine using natural language processing"""
-    
-    def __init__(self):
+
+    def __init__(self, llm_parser=None):
+        # Optional LLMQueryParser; fills in filters the rule-based parser misses
+        self.llm_parser = llm_parser
         try:
-            self.nlp = spacy.load("en_core_web_sm")
+            self.nlp = spacy.load("en_core_web_sm") if spacy else None
         except OSError:
-            print("Warning: spaCy English model not found. Using basic text processing.")
             self.nlp = None
+        if self.nlp is None:
+            print("Warning: spaCy English model not found. Using basic text processing.")
         
-        # Predefined locations in Botswana
-        self.locations = [
-            'Gaborone', 'Phakalane', 'Francistown', 'Maun', 'Kasane', 
-            'Serowe', 'Molepolole', 'Kanye', 'Mochudi', 'Lobatse', 
-            'Palapye', 'Jwaneng', 'Ghanzi', 'Tsabong', 'Letlhakane'
-        ]
+        self.locations = LOCATIONS
         
         # Property type synonyms
         self.property_types = {
@@ -87,7 +96,16 @@ class PropertySearchEngine:
             search_params['keywords'] = self._extract_keywords_nlp(query)
         else:
             search_params['keywords'] = self._extract_keywords_basic(query)
-        
+
+        # Let the LLM fill any filters the rules couldn't find
+        if self.llm_parser:
+            llm_params = self.llm_parser.parse(query) or {}
+            if llm_params.get('location') and llm_params['location'].lower() not in query:
+                del llm_params['location']  # don't trust invented towns
+            for key, value in llm_params.items():
+                if search_params.get(key) is None:
+                    search_params[key] = value
+
         return search_params
     
     def _extract_property_type(self, query: str) -> Optional[str]:

@@ -23,6 +23,8 @@ def create_app():
     return app
 
 if __name__ == '__main__':
+    # Import via the module name so routes/models share this module's db
+    from app import create_app
     app = create_app()
     app.run(host='0.0.0.0', debug=True)
 

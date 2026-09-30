@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+    <div class="row justify-content-center">
+        <div class="col-lg-5 col-md-7">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white text-center">
+                    <h4 class="mb-0">
+                        <i class="fas fa-sign-in-alt me-2"></i>
+                        Welcome Back
+                    </h4>
+                    <p class="mb-0 mt-2 text-light">Sign in to your Rent Me account</p>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" action="">
+                        <div class="mb-3">
+                            <label for="email" class="form-label">
+                                <i class="fas fa-envelope me-1"></i>Email Address
+                            </label>
+                            <input type="email" 
+                                   class="form-control form-control-lg" 
+                                   id="email" 
+                                   name="email" 
+                                   placeholder="your.email@example.com"
+                                   required>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="password" class="form-label">
+                                <i class="fas fa-lock me-1"></i>Password
+                            </label>
+                            <input type="password" 
+                                   class="form-control form-control-lg" 
+                                   id="password" 
+                                   name="password" 
+                                   placeholder="Enter your password"
+                                   required>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-sign-in-alt me-2"></i>Sign In
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer text-center bg-light">
+                    <small class="text-muted">
+                        Don't have an account? 
+                        <a href="{{ url_for('main.register') }}" class="text-decoration-none">
+                            <i class="fas fa-user-plus me-1"></i>Create one here
+                        </a>
+                    </small>
+                </div>
+            </div>
+
+            <!-- Demo Accounts Info -->
+            <div class="card mt-4 bg-light">
+                <div class="card-body text-center">
+                    <h6 class="card-title">
+                        <i class="fas fa-info-circle me-2"></i>Demo Accounts
+                    </h6>
+                    <p class="card-text small text-muted mb-3">
+                        For testing purposes, you can create new accounts or use these demo credentials:
+                    </p>
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="border rounded p-2 mb-2">
+                                <strong>Landlord Demo</strong><br>
+                                <small class="text-muted">
+                                    Email: landlord@demo.com<br>
+                                    Password: demo123
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="border rounded p-2 mb-2">
+                                <strong>Renter Demo</strong><br>
+                                <small class="text-muted">
+                                    Email: renter@demo.com<br>
+                                    Password: demo123
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+

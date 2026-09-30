@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-heart text-danger me-2"></i>My Favorites</h1>
+        <a href="{{ url_for('main.home') }}" class="btn btn-outline-primary">
+            <i class="fas fa-search me-1"></i>Browse More Properties
+        </a>
+    </div>
+
+    {% if properties %}
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    You have <strong>{{ properties|length }}</strong> favorite propert{{ 'ies' if properties|length != 1 else 'y' }}.
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            {% for property in properties %}
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="card property-card h-100">
+                        <div class="position-relative">
+                            <img src="{{ url_for('static', filename='property_pics/' + property.image_file) }}" 
+                                 class="card-img-top" 
+                                 alt="{{ property.title }}"
+                                 onerror="this.src='{{ url_for('static', filename='property_pics/default.jpg') }}'">
+                            
+                            <!-- Property Type Badge -->
+                            <span class="badge bg-secondary position-absolute top-0 start-0 m-2 property-type-badge">
+                                {{ property.property_type.title() }}
+                            </span>
+                            
+                            <!-- Remove from Favorites Button -->
+                            <button class="btn favorite-btn position-absolute top-0 end-0 m-2" 
+                                    data-property-id="{{ property.id }}"
+                                    title="Remove from favorites">
+                                <i class="fas fa-heart text-danger"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title">{{ property.title }}</h5>
+                            <p class="card-text text-muted flex-grow-1">
+                                {{ property.description[:120] }}{% if property.description|length > 120 %}...{% endif %}
+                            </p>
+                            
+                            <div class="property-details mb-3">
+                                <div class="property-detail-item">
+                                    <i class="fas fa-map-marker-alt text-primary"></i>
+                                    <span>{{ property.location }}</span>
+                                </div>
+                                <div class="property-detail-item">
+                                    <i class="fas fa-bed text-primary"></i>
+                                    <span>{{ property.bedrooms }} bed{{ 's' if property.bedrooms != 1 else '' }}</span>
+                                </div>
+                                <div class="property-detail-item">
+                                    <i class="fas fa-user text-primary"></i>
+                                    <span>{{ property.landlord.username }}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="property-price">P{{ property.price }}</div>
+                                <div class="btn-group">
+                                    <a href="{{ url_for('main.property_detail', property_id=property.id) }}" 
+                                       class="btn btn-primary btn-sm">
+                                        View Details
+                                    </a>
+                                    <a href="{{ url_for('main.send_message', recipient_id=property.landlord.id, property_id=property.id) }}" 
+                                       class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-envelope"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-heart fa-4x text-muted mb-4"></i>
+            <h3>No favorites yet</h3>
+            <p class="text-muted mb-4">Start browsing properties and click the heart icon to save your favorites.</p>
+            <a href="{{ url_for('main.home') }}" class="btn btn-primary btn-lg">
+                <i class="fas fa-search me-2"></i>Browse Properties
+            </a>
+        </div>
+    {% endif %}
+
+    <!-- Quick Actions -->
+    {% if properties %}
+        <div class="row mt-5">
+            <div class="col-12">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Quick Actions</h5>
+                        <div class="btn-group" role="group">
+                            <a href="{{ url_for('main.home') }}" class="btn btn-outline-primary">
+                                <i class="fas fa-search me-1"></i>Find More Properties
+                            </a>
+                            <a href="{{ url_for('main.inbox') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-envelope me-1"></i>Check Messages
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
+

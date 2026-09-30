@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block content %}
+    <!-- Hero Section with Search -->
+    <div class="hero-section bg-primary text-white py-5 mb-5 rounded">
+        <div class="container text-center">
+            <h1 class="display-4 fw-bold mb-3">Find Your Perfect Home in Botswana</h1>
+            <p class="lead mb-4">Use our AI-powered search to describe what you're looking for in plain English</p>
+            
+            <!-- AI Search Bar -->
+            <div class="search-container">
+                <form method="GET" action="{{ url_for('main.home') }}" id="search-form">
+                    {# Keep the chosen filters when running a text search #}
+                    {% for key in ['property_type', 'location', 'bedrooms', 'min_price', 'max_price', 'sort'] %}
+                        {% if filters[key] %}<input type="hidden" name="{{ key }}" value="{{ filters[key] }}">{% endif %}
+                    {% endfor %}
+                    <div class="input-group input-group-lg">
+                        <input type="text" 
+                               class="form-control search-input" 
+                               id="search-input"
+                               name="search" 
+                               value="{{ search_query }}"
+                               placeholder="Try: 'cheap 2 bedroom house in Gaborone' or 'affordable flat under P4000'"
+                               autocomplete="off">
+                        <button class="btn btn-light" type="submit">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                    </div>
+                    <div id="search-suggestions" class="search-suggestions"></div>
+                </form>
+            </div>
+            
+            {% if search_query %}
+                <div class="mt-3">
+                    <small class="text-light">
+                        Showing results for: <strong>"{{ search_query }}"</strong>
+                        <a href="{{ url_for('main.home') }}" class="text-light ms-2">
+                            <i class="fas fa-times"></i> Clear search
+                        </a>
+                    </small>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <form method="GET" action="{{ url_for('main.home') }}" class="card mb-4" id="filter-form">
+        <div class="card-body">
+            {% if search_query %}<input type="hidden" name="search" value="{{ search_query }}">{% endif %}
+            <div class="row g-2 align-items-end">
+                <div class="col-6 col-md-2">
+                    <label for="filter-type" class="form-label small mb-1">Type</label>
+                    <select class="form-select" id="filter-type" name="property_type">
+                        <option value="">Any type</option>
+                        <option value="house" {{ 'selected' if filters.property_type == 'house' }}>House</option>
+                        <option value="flat" {{ 'selected' if filters.property_type == 'flat' }}>Flat/Apartment</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label for="filter-location" class="form-label small mb-1">Town</label>
+                    <select class="form-select" id="filter-location" name="location">
+                        <option value="">Any town</option>
+                        {% for town in locations %}
+                            <option value="{{ town }}" {{ 'selected' if filters.location == town }}>{{ town }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label for="filter-bedrooms" class="form-label small mb-1">Bedrooms</label>
+                    <select class="form-select" id="filter-bedrooms" name="bedrooms">
+                        <option value="">Any</option>
+                        {% for n in range(1, 5) %}
+                            <option value="{{ n }}" {{ 'selected' if filters.bedrooms == n }}>{{ n }}</option>
+                        {% endfor %}
+                        <option value="5" {{ 'selected' if filters.bedrooms and filters.bedrooms >= 5 }}>5+</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label small mb-1" for="filter-min">Price (P)</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="filter-min" name="min_price" min="0" placeholder="Min" value="{{ filters.min_price or '' }}">
+                        <input type="number" class="form-control" name="max_price" min="0" placeholder="Max" aria-label="Maximum price" value="{{ filters.max_price or '' }}">
+                    </div>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label for="filter-sort" class="form-label small mb-1">Sort by</label>
+                    <select class="form-select" id="filter-sort" name="sort">
+                        <option value="newest" {{ 'selected' if filters.sort == 'newest' }}>Newest</option>
+                        <option value="price_asc" {{ 'selected' if filters.sort == 'price_asc' }}>Price: low to high</option>
+                        <option value="price_desc" {{ 'selected' if filters.sort == 'price_desc' }}>Price: high to low</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-grow-1">
+                        <i class="fas fa-filter me-1"></i>Filter
+                    </button>
+                    {% if filters_active %}
+                        <a href="{{ url_for('main.home') }}" class="btn btn-outline-secondary" title="Clear all filters">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <!-- Search Results Summary -->
+    {% if filters_active %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Found <strong>{{ properties|length }}</strong> {{ 'property' if properties|length == 1 else 'properties' }} matching your search.
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Properties Grid -->
+    <div class="row">
+        {% if properties %}
+            {% for property in properties %}
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="card property-card h-100">
+                        <div class="position-relative">
+                            <img src="{{ url_for('static', filename='property_pics/' + property.image_file) }}" 
+                                 class="card-img-top" 
+                                 alt="{{ property.title }}"
+                                 onerror="this.src='{{ url_for('static', filename='property_pics/default.jpg') }}'">
+                            
+                            <!-- Property Type Badge -->
+                            <span class="badge bg-secondary position-absolute top-0 start-0 m-2 property-type-badge">
+                                {{ property.property_type.title() }}
+                            </span>
+                            
+                            <!-- Favorite Button (for logged-in renters) -->
+                            {% if current_user.is_authenticated and current_user.role == "Renter" %}
+                                {% set is_favorited = current_user.favorites.filter_by(property_id=property.id).first() %}
+                                <button class="btn favorite-btn position-absolute top-0 end-0 m-2" 
+                                        data-property-id="{{ property.id }}"
+                                        title="{{ 'Remove from favorites' if is_favorited else 'Add to favorites' }}">
+                                    <i class="{{ 'fas fa-heart text-danger' if is_favorited else 'far fa-heart' }}"></i>
+                                </button>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title">{{ property.title }}</h5>
+                            <p class="card-text text-muted flex-grow-1">
+                                {{ property.description[:120] }}{% if property.description|length > 120 %}...{% endif %}
+                            </p>
+                            
+                            <div class="property-details mb-3">
+                                <div class="property-detail-item">
+                                    <i class="fas fa-map-marker-alt text-primary"></i>
+                                    <span>{{ property.location }}</span>
+                                </div>
+                                <div class="property-detail-item">
+                                    <i class="fas fa-bed text-primary"></i>
+                                    <span>{{ property.bedrooms }} bed{{ 's' if property.bedrooms != 1 else '' }}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="property-price">P{{ property.price }}</div>
+                                <a href="{{ url_for('main.property_detail', property_id=property.id) }}" 
+                                   class="btn btn-primary">
+                                    View Details
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="text-center py-5">
+                    {% if filters_active %}
+                        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                        <h3>No properties found</h3>
+                        <p class="text-muted">Try adjusting your search terms or browse all available properties.</p>
+                        <a href="{{ url_for('main.home') }}" class="btn btn-primary">View All Properties</a>
+                    {% else %}
+                        <i class="fas fa-home fa-3x text-muted mb-3"></i>
+                        <h3>No properties available</h3>
+                        <p class="text-muted">Check back later for new listings.</p>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Search Tips -->
+    {% if not filters_active %}
+        <div class="row mt-5">
+            <div class="col-12">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-lightbulb text-warning me-2"></i>
+                            Search Tips
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Try these example searches:</h6>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-arrow-right text-primary me-2"></i>"cheap 2 bedroom house in Gaborone"</li>
+                                    <li><i class="fas fa-arrow-right text-primary me-2"></i>"affordable flat under P4000"</li>
+                                    <li><i class="fas fa-arrow-right text-primary me-2"></i>"3 bedroom apartment in Phakalane"</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>You can search by:</h6>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-check text-success me-2"></i>Property type (house, flat, apartment)</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Number of bedrooms</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Location in Botswana</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Price range (cheap, affordable, under P5000)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
+
