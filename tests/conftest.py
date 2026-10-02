@@ -12,7 +12,7 @@ from models import User, Property
 @pytest.fixture
 def app(tmp_path):
     app = create_app()
-    app.config.update(TESTING=True, UPLOAD_FOLDER=str(tmp_path))
+    app.config.update(TESTING=True, UPLOAD_FOLDER=str(tmp_path), WTF_CSRF_ENABLED=False)
     with app.app_context():
         landlord = User(username='landlord', email='landlord@test.com', role='Landlord')
         landlord.set_password('pw123')

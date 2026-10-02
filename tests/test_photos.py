@@ -1,10 +1,18 @@
 import io
 import os
 from app import db
+from PIL import Image
 from models import Property, Favorite, Message, User
 
-PNG = b'\x89PNG\r\n\x1a\n' + b'\x00' * 32
-JPG = b'\xff\xd8\xff\xe0' + b'\x00' * 32
+
+def make_image(fmt='PNG', size=(60, 40), mode='RGB'):
+    buffer = io.BytesIO()
+    Image.new(mode, size).save(buffer, fmt)
+    return buffer.getvalue()
+
+
+PNG = make_image('PNG')
+JPG = make_image('JPEG')
 
 
 def property_form(**overrides):
@@ -19,7 +27,7 @@ def test_new_property_with_photo(app, landlord_client):
     resp = landlord_client.post('/property/new', data=data, content_type='multipart/form-data')
     assert resp.status_code == 302
     property = Property.query.filter_by(title='New place').one()
-    assert property.image_file.endswith('.png')
+    assert property.image_file.endswith('.jpg')  # every upload is stored as a JPEG
     assert property.image_file != 'default.jpg'
     assert os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], property.image_file))
 
@@ -85,4 +93,35 @@ def test_delete_property_removes_photo_and_favorites(app, landlord_client):
     assert Favorite.query.count() == 0
     # The message is kept, just no longer linked to the deleted listing
     assert Message.query.one().property_id is None
+    assert os.listdir(app.config['UPLOAD_FOLDER']) == []
+
+
+def uploaded_image(app, landlord_client, data, name):
+    form = property_form(image=(io.BytesIO(data), name))
+    landlord_client.post('/property/new', data=form, content_type='multipart/form-data')
+    property = Property.query.filter_by(title='New place').first()
+    if property is None:
+        return None
+    return Image.open(os.path.join(app.config['UPLOAD_FOLDER'], property.image_file))
+
+
+def test_large_photo_is_shrunk(app, landlord_client):
+    image = uploaded_image(app, landlord_client, make_image('JPEG', size=(4000, 3000)), 'big.jpg')
+    assert image.size == (1200, 900)
+    assert image.format == 'JPEG'
+
+
+def test_small_photo_is_not_enlarged(app, landlord_client):
+    image = uploaded_image(app, landlord_client, make_image('PNG', size=(300, 200)), 'small.png')
+    assert image.size == (300, 200)
+
+
+def test_transparent_png_is_converted(app, landlord_client):
+    image = uploaded_image(app, landlord_client, make_image('PNG', mode='RGBA'), 'clear.png')
+    assert image.mode == 'RGB'
+
+
+def test_corrupt_image_is_rejected(app, landlord_client):
+    broken = bytes([0x89]) + b'PNG' + bytes([13, 10, 26, 10]) + bytes(64)  # right header, not a real image
+    assert uploaded_image(app, landlord_client, broken, 'broken.png') is None
     assert os.listdir(app.config['UPLOAD_FOLDER']) == []

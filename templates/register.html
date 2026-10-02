@@ -11,7 +11,7 @@
                     <p class="mb-0 mt-2 text-light">Join Rent Me to find your perfect home</p>
                 </div>
                 <div class="card-body p-4">
-                    <form method="POST" action="">
+                    <form method="POST" action=""><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-3">
                             <label for="username" class="form-label">
                                 <i class="fas fa-user me-1"></i>Username
@@ -21,6 +21,8 @@
                                    id="username" 
                                    name="username" 
                                    placeholder="Choose a unique username"
+                                   maxlength="20"
+                                   value="{{ form.username or '' }}"
                                    required>
                             <div class="form-text">This will be your display name on the platform.</div>
                         </div>
@@ -34,6 +36,7 @@
                                    id="email" 
                                    name="email" 
                                    placeholder="your.email@example.com"
+                                   value="{{ form.email or '' }}"
                                    required>
                             <div class="form-text">We'll use this for login and important notifications.</div>
                         </div>
@@ -47,8 +50,9 @@
                                    id="password" 
                                    name="password" 
                                    placeholder="Create a strong password"
+                                   minlength="6"
                                    required>
-                            <div class="form-text">Choose a secure password with at least 8 characters.</div>
+                            <div class="form-text">Choose a secure password with at least 6 characters.</div>
                         </div>
 
                         <div class="mb-4">
@@ -59,7 +63,7 @@
                                 <div class="col-6">
                                     <div class="card role-card">
                                         <div class="card-body text-center">
-                                            <input type="radio" class="btn-check" name="role" id="renter" value="Renter" checked>
+                                            <input type="radio" class="btn-check" name="role" id="renter" value="Renter" {{ 'checked' if form.role != 'Landlord' }}>
                                             <label class="btn btn-outline-primary w-100" for="renter">
                                                 <i class="fas fa-search fa-2x d-block mb-2"></i>
                                                 <strong>Renter</strong>
@@ -71,7 +75,7 @@
                                 <div class="col-6">
                                     <div class="card role-card">
                                         <div class="card-body text-center">
-                                            <input type="radio" class="btn-check" name="role" id="landlord" value="Landlord">
+                                            <input type="radio" class="btn-check" name="role" id="landlord" value="Landlord" {{ 'checked' if form.role == 'Landlord' }}>
                                             <label class="btn btn-outline-primary w-100" for="landlord">
                                                 <i class="fas fa-home fa-2x d-block mb-2"></i>
                                                 <strong>Landlord</strong>

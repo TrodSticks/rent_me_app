@@ -75,6 +75,16 @@ A full-stack web application for property rentals in Botswana, featuring AI-powe
 6. **Access the application**
    Open your browser and go to `http://localhost:5000`
 
+### Settings (environment variables)
+
+| Variable | What it does | Default |
+|---|---|---|
+| `SECRET_KEY` | Signs login cookies. **Set this on any real server.** | A random key saved to a git-ignored `.secret_key` file |
+| `FLASK_DEBUG` | Set to `1` for debug mode while developing. Never use it on a public server. | Off |
+| `DATABASE_URL` | Database connection string | Local `app.db` SQLite file |
+| `HOST` / `PORT` | Address and port the app listens on | `0.0.0.0` / `5000` |
+| `USE_LLM_SEARCH` | Set to `1` to turn on the optional AI search model | Off |
+
 ## Demo Accounts
 
 The sample data script creates the following demo accounts:

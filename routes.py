@@ -1,8 +1,12 @@
 import os
+import re
 import secrets
+from urllib.parse import urlparse
 from flask import render_template, url_for, flash, redirect, request, Blueprint, jsonify, current_app
 from flask_login import login_user, current_user, logout_user, login_required
-from sqlalchemy import or_
+from flask_wtf.csrf import CSRFError
+from PIL import Image, ImageOps, UnidentifiedImageError
+from sqlalchemy import func, or_
 from app import db
 from models import User, Property, Message, Favorite
 from search_engine import PropertySearchEngine, LOCATIONS
@@ -20,7 +24,13 @@ SORT_OPTIONS = {
     'price_desc': Property.price.desc(),
 }
 
+PER_PAGE = 12  # listings per page on the home page
+SIMILAR_COUNT = 3
+
 MIN_PASSWORD_LENGTH = 6
+MAX_USERNAME_LENGTH = 20
+EMAIL_PATTERN = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+ROLES = ('Renter', 'Landlord')
 
 
 @bp.app_context_processor
@@ -34,32 +44,56 @@ def upload_too_large(e):
     return redirect(request.url)
 
 
+@bp.app_errorhandler(CSRFError)
+def csrf_failed(e):
+    if request.path.startswith('/favorite/'):
+        return jsonify({"error": "Your session expired. Reload the page and try again."}), 400
+    flash("That form expired or came from another site. Please try again.", "danger")
+    return redirect(request.referrer if is_safe_redirect(request.referrer) else url_for("main.home"))
+
+
+def is_safe_redirect(target):
+    """Only allow redirects that stay on this site."""
+    if not target:
+        return False
+    target = target.replace('\\', '/')
+    url = urlparse(target)
+    if url.scheme or url.netloc:
+        # Absolute URLs are fine only when they point back at this host
+        return url.scheme in ('http', 'https') and url.netloc == request.host
+    return target.startswith('/') and not target.startswith('//')
+
+
 # ---------- Property photo helpers ----------
 
-def _image_extension(header: bytes):
-    """Identify an image from its first bytes, so renamed non-images are rejected."""
-    if header.startswith(b'\xff\xd8\xff'):
-        return 'jpg'
-    if header.startswith(b'\x89PNG\r\n\x1a\n'):
-        return 'png'
-    if header[:6] in (b'GIF87a', b'GIF89a'):
-        return 'gif'
-    if header[:4] == b'RIFF' and header[8:12] == b'WEBP':
-        return 'webp'
-    return None
+ALLOWED_IMAGE_FORMATS = ('JPEG', 'PNG', 'GIF', 'WEBP')
+MAX_IMAGE_SIDE = 1200  # pixels; larger photos are shrunk to fit
+JPEG_QUALITY = 82
 
 
 def save_picture(file_storage):
-    """Save an uploaded image under a random name. Returns the filename, or None if not an image."""
-    header = file_storage.stream.read(12)
-    file_storage.stream.seek(0)
-    ext = _image_extension(header)
-    if not ext:
+    """Shrink an uploaded photo and save it as a JPEG under a random name.
+
+    Returns the filename, or None if the upload isn't a readable image.
+    """
+    try:
+        image = Image.open(file_storage.stream)
+        if image.format not in ALLOWED_IMAGE_FORMATS:
+            return None
+        image = ImageOps.exif_transpose(image)  # respect phone camera rotation
+        image.thumbnail((MAX_IMAGE_SIDE, MAX_IMAGE_SIDE))
+        if image.mode != 'RGB':
+            # Flatten transparency onto white, since JPEG has none
+            rgba = image.convert('RGBA')
+            image = Image.new('RGB', rgba.size, (255, 255, 255))
+            image.paste(rgba, mask=rgba.getchannel('A'))
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
         return None
-    filename = f"{secrets.token_hex(7)}.{ext}"
+
+    filename = f"{secrets.token_hex(7)}.jpg"
     folder = current_app.config['UPLOAD_FOLDER']
     os.makedirs(folder, exist_ok=True)
-    file_storage.save(os.path.join(folder, filename))
+    image.save(os.path.join(folder, filename), 'JPEG', quality=JPEG_QUALITY, optimize=True)
     return filename
 
 
@@ -147,8 +181,21 @@ def home():
     filters_active = bool(search_query) or any(
         filters[k] for k in ('property_type', 'location', 'bedrooms', 'min_price', 'max_price')
     )
+
+    # Text search filters in Python, so page the final list rather than the SQL query
+    total = len(properties)
+    pages = max(1, -(-total // PER_PAGE))
+    page = min(max(request.args.get('page', 1, type=int), 1), pages)
+    properties = properties[(page - 1) * PER_PAGE:page * PER_PAGE]
+
+    def page_url(number):
+        args = request.args.to_dict()
+        args['page'] = number
+        return url_for("main.home", **args)
+
     return render_template("home.html", properties=properties, search_query=search_query,
-                           filters=filters, filters_active=filters_active)
+                           filters=filters, filters_active=filters_active,
+                           total=total, page=page, pages=pages, page_url=page_url)
 
 @bp.route("/api/search-suggestions")
 def search_suggestions():
@@ -164,19 +211,27 @@ def register():
     if current_user.is_authenticated:
         return redirect(url_for("main.home"))
     if request.method == "POST":
-        username = request.form.get("username")
-        email = request.form.get("email")
-        password = request.form.get("password")
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
         role = request.form.get("role")
 
-        # Check if user already exists
-        if User.query.filter_by(email=email).first():
-            flash("Email already registered. Please choose a different one.", "danger")
-            return render_template("register.html", title="Register")
-
-        if User.query.filter_by(username=username).first():
-            flash("Username already taken. Please choose a different one.", "danger")
-            return render_template("register.html", title="Register")
+        error = None
+        if not username or len(username) > MAX_USERNAME_LENGTH:
+            error = f"Please choose a username of 1 to {MAX_USERNAME_LENGTH} characters."
+        elif not EMAIL_PATTERN.match(email) or len(email) > 120:
+            error = "Please enter a valid email address."
+        elif len(password) < MIN_PASSWORD_LENGTH:
+            error = f"Your password must be at least {MIN_PASSWORD_LENGTH} characters."
+        elif role not in ROLES:
+            error = "Please choose whether you are a renter or a landlord."
+        elif User.query.filter(func.lower(User.email) == email).first():
+            error = "Email already registered. Please choose a different one."
+        elif User.query.filter_by(username=username).first():
+            error = "Username already taken. Please choose a different one."
+        if error:
+            flash(error, "danger")
+            return render_template("register.html", title="Register", form=request.form)
 
         user = User(username=username, email=email, role=role)
         user.set_password(password)
@@ -184,20 +239,20 @@ def register():
         db.session.commit()
         flash("Your account has been created! You are now able to log in", "success")
         return redirect(url_for("main.login"))
-    return render_template("register.html", title="Register")
+    return render_template("register.html", title="Register", form={})
 
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("main.home"))
     if request.method == "POST":
-        email = request.form.get("email")
-        password = request.form.get("password")
-        user = User.query.filter_by(email=email).first()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        user = User.query.filter(func.lower(User.email) == email).first()
         if user and user.check_password(password):
             login_user(user)
             next_page = request.args.get('next')
-            return redirect(next_page) if next_page else redirect(url_for("main.home"))
+            return redirect(next_page if is_safe_redirect(next_page) else url_for("main.home"))
         else:
             flash("Login Unsuccessful. Please check email and password", "danger")
     return render_template("login.html", title="Login")
@@ -215,14 +270,16 @@ def logout():
 def account():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
-        email = request.form.get("email", "").strip()
+        email = request.form.get("email", "").strip().lower()
         if not username or not email:
             flash("Username and email can't be empty.", "danger")
-        elif len(username) > 20:
+        elif len(username) > MAX_USERNAME_LENGTH:
             flash("Username must be 20 characters or fewer.", "danger")
+        elif not EMAIL_PATTERN.match(email) or len(email) > 120:
+            flash("Please enter a valid email address.", "danger")
         elif User.query.filter(User.username == username, User.id != current_user.id).first():
             flash("That username is already taken.", "danger")
-        elif User.query.filter(User.email == email, User.id != current_user.id).first():
+        elif User.query.filter(func.lower(User.email) == email, User.id != current_user.id).first():
             flash("That email is already registered to another account.", "danger")
         else:
             current_user.username = username
@@ -297,16 +354,39 @@ def new_property():
 
 @bp.route("/property/<int:property_id>")
 def property_detail(property_id):
-    property = Property.query.get_or_404(property_id)
+    property = db.get_or_404(Property, property_id)
     is_favorited = False
     if current_user.is_authenticated:
         is_favorited = Favorite.query.filter_by(user_id=current_user.id, property_id=property_id).first() is not None
-    return render_template("property_detail.html", title=property.title, property=property, is_favorited=is_favorited)
+    return render_template("property_detail.html", title=property.title, property=property,
+                           is_favorited=is_favorited, similar=similar_properties(property))
+
+
+def similar_properties(property):
+    """The listings most like this one: same town counts most, then type, bedrooms and price."""
+    def score(other):
+        points = 0
+        if other.location == property.location:
+            points += 3
+        if other.property_type == property.property_type:
+            points += 2
+        if other.bedrooms == property.bedrooms:
+            points += 1
+        if abs(other.price - property.price) <= property.price * 0.25:
+            points += 1
+        return points
+
+    candidates = Property.query.filter(Property.id != property.id).all()
+    scored = [(score(other), other) for other in candidates]
+    scored = [item for item in scored if item[0] > 0]
+    # Best score first; among equals, the closest price
+    scored.sort(key=lambda item: (-item[0], abs(item[1].price - property.price)))
+    return [other for _, other in scored[:SIMILAR_COUNT]]
 
 @bp.route("/property/<int:property_id>/update", methods=["GET", "POST"])
 @login_required
 def update_property(property_id):
-    property = Property.query.get_or_404(property_id)
+    property = db.get_or_404(Property, property_id)
     if property.landlord != current_user:
         flash("You do not have permission to edit this property.", "danger")
         return redirect(url_for("main.home"))
@@ -325,7 +405,7 @@ def update_property(property_id):
 @bp.route("/property/<int:property_id>/delete", methods=["POST"])
 @login_required
 def delete_property(property_id):
-    property = Property.query.get_or_404(property_id)
+    property = db.get_or_404(Property, property_id)
     if property.landlord != current_user:
         flash("You do not have permission to delete this property.", "danger")
         return redirect(url_for("main.home"))
@@ -347,7 +427,7 @@ def toggle_favorite(property_id):
     if current_user.role != "Renter":
         return jsonify({"error": "Only renters can favorite properties"}), 403
 
-    property = Property.query.get_or_404(property_id)
+    property = db.get_or_404(Property, property_id)
     favorite = Favorite.query.filter_by(user_id=current_user.id, property_id=property_id).first()
 
     if favorite:
@@ -403,7 +483,7 @@ def _get_property_or_none(property_id):
 @bp.route("/message/<int:recipient_id>", methods=["GET", "POST"])
 @login_required
 def send_message(recipient_id):
-    recipient = User.query.get_or_404(recipient_id)
+    recipient = db.get_or_404(User, recipient_id)
     if recipient == current_user:
         flash("You can't send a message to yourself.", "danger")
         return redirect(url_for("main.inbox"))
@@ -452,7 +532,7 @@ def inbox():
 @bp.route("/conversation/<int:user_id>")
 @login_required
 def conversation(user_id):
-    other_user = User.query.get_or_404(user_id)
+    other_user = db.get_or_404(User, user_id)
     property = _get_property_or_none(request.args.get('property_id', type=int))
     property_id = property.id if property else None
 
@@ -474,7 +554,7 @@ def conversation(user_id):
 @login_required
 def send_reply(recipient_id):
     content = request.form.get("content", "").strip()
-    recipient = User.query.get_or_404(recipient_id)
+    recipient = db.get_or_404(User, recipient_id)
     property = _get_property_or_none(request.form.get("property_id", type=int))
     property_id = property.id if property else None
 

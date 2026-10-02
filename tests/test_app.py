@@ -35,10 +35,10 @@ def test_search_suggestions_api(client):
 
 def test_register_and_login(client):
     resp = client.post('/register', data={
-        'username': 'renter1', 'email': 'r@test.com', 'password': 'pw', 'role': 'Renter',
+        'username': 'renter1', 'email': 'r@test.com', 'password': 'pw1234', 'role': 'Renter',
     })
     assert resp.status_code == 302
-    resp = client.post('/login', data={'email': 'r@test.com', 'password': 'pw'})
+    resp = client.post('/login', data={'email': 'r@test.com', 'password': 'pw1234'})
     assert resp.status_code == 302
     client.get('/logout')
     resp = client.post('/login', data={'email': 'r@test.com', 'password': 'wrong'})

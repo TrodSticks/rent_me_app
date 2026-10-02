@@ -66,7 +66,7 @@
                 
                 <!-- Message Input -->
                 <div class="card-footer">
-                    <form method="POST" action="{{ url_for('main.send_reply', recipient_id=other_user.id) }}" class="d-flex gap-2">
+                    <form method="POST" action="{{ url_for('main.send_reply', recipient_id=other_user.id) }}" class="d-flex gap-2"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         {% if property %}<input type="hidden" name="property_id" value="{{ property.id }}">{% endif %}
                         <div class="flex-grow-1">
                             <textarea class="form-control" 

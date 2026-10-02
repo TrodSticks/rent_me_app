@@ -9,3 +9,4 @@ static/property_pics/*
 !static/property_pics/default.jpg
 .pytest_cache/
 .claude/
+.secret_key

@@ -1,11 +1,16 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db, login_manager
 
+
+def utcnow():
+    """Current UTC time, stored without a timezone like the existing rows."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -49,7 +54,7 @@ class Message(db.Model):
     recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     property_id = db.Column(db.Integer, db.ForeignKey('property.id'), nullable=True)
     content = db.Column(db.Text, nullable=False)
-    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, nullable=False, default=utcnow)
     read = db.Column(db.Boolean, default=False)
     property = db.relationship('Property', backref='messages')
 
@@ -60,7 +65,7 @@ class Favorite(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     property_id = db.Column(db.Integer, db.ForeignKey('property.id'), nullable=False)
-    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, nullable=False, default=utcnow)
 
     def __repr__(self):
         return f"Favorite('{self.user_id}', '{self.property_id}')"
