@@ -1,97 +1,78 @@
 {% extends "base.html" %}
+{% from "_macros.html" import photo_url, default_photo, empty_state with context %}
 {% block content %}
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Landlord Dashboard</h1>
-        <a href="{{ url_for('main.new_property') }}" class="btn btn-primary">Add New Property</a>
+    <div class="section-title mt-2">
+        <h1>Dashboard</h1>
+        <a href="{{ url_for('main.new_property') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Add property
+        </a>
     </div>
-    
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h5 class="card-title">Total Properties</h5>
-                    <h2 class="text-primary">{{ properties|length }}</h2>
-                </div>
+
+    <div class="row g-3 mb-2">
+        <div class="col-6 col-md-3">
+            <div class="rm-stat accent">
+                <span>Properties</span>
+                <strong>{{ properties|length }}</strong>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h5 class="card-title">Average Price</h5>
-                    <h2 class="text-success">
-                        {% if properties %}
-                            P{{ (properties|sum(attribute='price') / properties|length)|round|int }}
-                        {% else %}
-                            P0
-                        {% endif %}
-                    </h2>
-                </div>
+        <div class="col-6 col-md-3">
+            <div class="rm-stat">
+                <span>Average rent</span>
+                <strong>
+                    {% if properties %}P{{ '{:,}'.format((properties|sum(attribute='price') / properties|length)|round|int) }}{% else %}P0{% endif %}
+                </strong>
             </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <a class="rm-stat" href="{{ url_for('main.inbox') }}">
+                <span>Messages received</span>
+                <strong>{{ message_counts.values()|sum }}</strong>
+            </a>
         </div>
     </div>
 
-    <h2>Your Properties</h2>
+    <div class="section-title"><h2>Your properties</h2></div>
     {% if properties %}
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Title</th>
-                        <th>Type</th>
-                        <th>Location</th>
-                        <th>Price</th>
-                        <th>Bedrooms</th>
-                        <th>Messages</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for property in properties %}
-                        <tr>
-                            <td>
-                                <a href="{{ url_for('main.property_detail', property_id=property.id) }}" class="text-decoration-none">
-                                    <img src="{{ url_for('static', filename='property_pics/' + property.image_file) }}"
-                                         alt="" class="rounded me-2" style="width: 48px; height: 36px; object-fit: cover;"
-                                         onerror="this.src='{{ url_for('static', filename='property_pics/default.jpg') }}'">
-                                    {{ property.title }}
-                                </a>
-                            </td>
-                            <td>
-                                <span class="badge bg-secondary">{{ property.property_type.title() }}</span>
-                            </td>
-                            <td>{{ property.location }}</td>
-                            <td><strong>P{{ property.price }}</strong></td>
-                            <td>{{ property.bedrooms }}</td>
-                            <td>
-                                {% if message_counts[property.id] %}
-                                    <a href="{{ url_for('main.inbox', property_id=property.id) }}" class="text-decoration-none">
-                                        <i class="fas fa-envelope me-1"></i>{{ message_counts[property.id] }}
-                                    </a>
-                                {% else %}
-                                    <span class="text-muted">0</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="btn-group" role="group">
-                                    <a href="{{ url_for('main.property_detail', property_id=property.id) }}" class="btn btn-outline-primary btn-sm">View</a>
-                                    <a href="{{ url_for('main.update_property', property_id=property.id) }}" class="btn btn-outline-secondary btn-sm">Edit</a>
-                                    <form action="{{ url_for('main.delete_property', property_id=property.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this property?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                        <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        {% for property in properties %}
+            <div class="rm-row">
+                <img class="rm-row-thumb" src="{{ photo_url(property) }}" alt="" loading="lazy"
+                     onerror="this.onerror=null;this.src='{{ default_photo() }}'">
+                <div class="rm-row-main">
+                    <h3><a href="{{ url_for('main.property_detail', property_id=property.id) }}">{{ property.title }}</a></h3>
+                    <div class="property-details">
+                        <span class="property-detail-item"><i class="fas fa-map-marker-alt"></i>{{ property.location }}</span>
+                        <span class="property-detail-item"><i class="fas fa-bed"></i>{{ property.bedrooms }} bed{{ 's' if property.bedrooms != 1 else '' }}</span>
+                        <span class="property-detail-item"><i class="fas fa-building"></i>{{ 'Flat' if property.property_type == 'flat' else 'House' }}</span>
+                    </div>
+                    <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
+                        <span class="property-price">P{{ '{:,}'.format(property.price) }} <small>/ month</small></span>
+                        {% if message_counts[property.id] %}
+                            <a href="{{ url_for('main.inbox', property_id=property.id) }}" class="rm-tag blue">
+                                <i class="far fa-envelope"></i>{{ message_counts[property.id] }} message{{ 's' if message_counts[property.id] != 1 else '' }}
+                            </a>
+                        {% else %}
+                            <span class="rm-tag">No messages</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="rm-row-side">
+                    <div class="rm-row-actions">
+                        <a href="{{ url_for('main.update_property', property_id=property.id) }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-pen me-1"></i>Edit
+                        </a>
+                        <form action="{{ url_for('main.delete_property', property_id=property.id) }}" method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-outline-danger btn-sm" aria-label="Delete {{ property.title }}">
+                                <i class="far fa-trash-alt me-1"></i>Delete
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
     {% else %}
-        <div class="alert alert-info" role="alert">
-            <h4 class="alert-heading">No Properties Listed</h4>
-            <p>You haven't listed any properties yet. Start by adding your first property to attract potential renters.</p>
-            <hr>
-            <a href="{{ url_for('main.new_property') }}" class="btn btn-primary">Add Your First Property</a>
-        </div>
+        {% call empty_state('fas fa-home', 'No properties listed yet') %}
+            <p class="text-muted">Add your first property so renters can find it.</p>
+            <a href="{{ url_for('main.new_property') }}" class="btn btn-primary">Add your first property</a>
+        {% endcall %}
     {% endif %}
 {% endblock %}
-

@@ -1,0 +1,58 @@
+{# Shared building blocks. Import with: {% from "_macros.html" import property_card with context %} #}
+
+{% macro photo_url(property) -%}
+    {{ url_for('static', filename='property_pics/' + property.image_file) }}
+{%- endmacro %}
+
+{% macro default_photo() -%}
+    {{ url_for('static', filename='property_pics/default.jpg') }}
+{%- endmacro %}
+
+{# A listing card: inset photo with price and type, heart for renters, title and key facts. #}
+{% macro property_card(property, title_class='', favorited=None) %}
+    <article class="property-card">
+        <div class="rm-photo">
+            <img src="{{ photo_url(property) }}" alt="" loading="lazy" onerror="this.onerror=null;this.src='{{ default_photo() }}'">
+            <span class="rm-pill">{{ 'Flat' if property.property_type == 'flat' else 'House' }}</span>
+            <span class="rm-price-tag">P{{ '{:,}'.format(property.price) }} <small>/ month</small></span>
+        </div>
+        {% if current_user.is_authenticated and current_user.role == "Renter" %}
+            {% set is_favorited = favorited if favorited is not none else current_user.favorites.filter_by(property_id=property.id).first() %}
+            <button class="favorite-btn" type="button"
+                    data-property-id="{{ property.id }}"
+                    title="{{ 'Remove from favorites' if is_favorited else 'Add to favorites' }}"
+                    aria-label="{{ 'Remove from favorites' if is_favorited else 'Add to favorites' }}">
+                <i class="{{ 'fas fa-heart text-danger' if is_favorited else 'far fa-heart' }}"></i>
+            </button>
+        {% endif %}
+        <div class="rm-card-body">
+            <h5 class="card-title{{ ' ' + title_class if title_class }}">{{ property.title }}</h5>
+            <div class="property-details mt-auto">
+                <span class="property-detail-item"><i class="fas fa-map-marker-alt"></i>{{ property.location }}</span>
+                <span class="property-detail-item"><i class="fas fa-bed"></i>{{ property.bedrooms }} bed{{ 's' if property.bedrooms != 1 else '' }}</span>
+            </div>
+            <a class="stretched-link" href="{{ url_for('main.property_detail', property_id=property.id) }}" aria-label="View {{ property.title }}"></a>
+        </div>
+    </article>
+{% endmacro %}
+
+{# Empty-state block with an icon, a heading and optional body content from the caller. #}
+{% macro empty_state(icon, heading) %}
+    <div class="rm-empty">
+        <div class="rm-empty-icon"><i class="{{ icon }}"></i></div>
+        <h3>{{ heading }}</h3>
+        {{ caller() if caller }}
+    </div>
+{% endmacro %}
+
+{# Switch between the list and the map, keeping the current search and filters. #}
+{% macro view_switch(active) %}
+    <div class="rm-switch" role="group" aria-label="View">
+        <a href="{{ filter_url('main.home') }}" class="{{ 'active' if active == 'list' }}" {{ 'aria-current="page"'|safe if active == 'list' }}>
+            <i class="fas fa-th-large"></i>List
+        </a>
+        <a href="{{ filter_url('main.map_view') }}" class="{{ 'active' if active == 'map' }}" {{ 'aria-current="page"'|safe if active == 'map' }}>
+            <i class="far fa-map"></i>Map
+        </a>
+    </div>
+{% endmacro %}

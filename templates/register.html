@@ -1,131 +1,69 @@
 {% extends "base.html" %}
 {% block content %}
-    <div class="row justify-content-center">
-        <div class="col-lg-6 col-md-8">
-            <div class="card shadow">
-                <div class="card-header bg-primary text-white text-center">
-                    <h4 class="mb-0">
-                        <i class="fas fa-user-plus me-2"></i>
-                        Create Your Account
-                    </h4>
-                    <p class="mb-0 mt-2 text-light">Join Rent Me to find your perfect home</p>
-                </div>
-                <div class="card-body p-4">
-                    <form method="POST" action=""><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <div class="mb-3">
-                            <label for="username" class="form-label">
-                                <i class="fas fa-user me-1"></i>Username
-                            </label>
-                            <input type="text" 
-                                   class="form-control form-control-lg" 
-                                   id="username" 
-                                   name="username" 
-                                   placeholder="Choose a unique username"
-                                   maxlength="20"
-                                   value="{{ form.username or '' }}"
-                                   required>
-                            <div class="form-text">This will be your display name on the platform.</div>
-                        </div>
+    <div class="rm-auth">
+        <div class="rm-auth-head">
+            <img src="{{ url_for('static', filename='icons/icon.svg') }}" alt="">
+            <h1>Create your account</h1>
+            <p>Join Rent Me to find your next home</p>
+        </div>
 
-                        <div class="mb-3">
-                            <label for="email" class="form-label">
-                                <i class="fas fa-envelope me-1"></i>Email Address
-                            </label>
-                            <input type="email" 
-                                   class="form-control form-control-lg" 
-                                   id="email" 
-                                   name="email" 
-                                   placeholder="your.email@example.com"
-                                   value="{{ form.email or '' }}"
-                                   required>
-                            <div class="form-text">We'll use this for login and important notifications.</div>
-                        </div>
+        <div class="card">
+            <div class="card-body p-4">
+                <form method="POST" action=""><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control form-control-lg" id="username" name="username"
+                               placeholder="Choose a username" maxlength="20" autocomplete="username"
+                               value="{{ form.username or '' }}" required>
+                        <div class="form-text">Shown to other people on Rent Me. Up to 20 characters.</div>
+                    </div>
 
-                        <div class="mb-3">
-                            <label for="password" class="form-label">
-                                <i class="fas fa-lock me-1"></i>Password
-                            </label>
-                            <input type="password" 
-                                   class="form-control form-control-lg" 
-                                   id="password" 
-                                   name="password" 
-                                   placeholder="Create a strong password"
-                                   minlength="6"
-                                   required>
-                            <div class="form-text">Choose a secure password with at least 6 characters.</div>
-                        </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email address</label>
+                        <input type="email" class="form-control form-control-lg" id="email" name="email"
+                               placeholder="your.email@example.com" autocomplete="email"
+                               value="{{ form.email or '' }}" required>
+                    </div>
 
-                        <div class="mb-4">
-                            <label for="role" class="form-label">
-                                <i class="fas fa-user-tag me-1"></i>I am a...
-                            </label>
-                            <div class="row">
-                                <div class="col-6">
-                                    <div class="card role-card">
-                                        <div class="card-body text-center">
-                                            <input type="radio" class="btn-check" name="role" id="renter" value="Renter" {{ 'checked' if form.role != 'Landlord' }}>
-                                            <label class="btn btn-outline-primary w-100" for="renter">
-                                                <i class="fas fa-search fa-2x d-block mb-2"></i>
-                                                <strong>Renter</strong>
-                                                <small class="d-block text-muted">Looking for a place to rent</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="card role-card">
-                                        <div class="card-body text-center">
-                                            <input type="radio" class="btn-check" name="role" id="landlord" value="Landlord" {{ 'checked' if form.role == 'Landlord' }}>
-                                            <label class="btn btn-outline-primary w-100" for="landlord">
-                                                <i class="fas fa-home fa-2x d-block mb-2"></i>
-                                                <strong>Landlord</strong>
-                                                <small class="d-block text-muted">Have properties to rent out</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control form-control-lg" id="password" name="password"
+                               placeholder="Create a password" minlength="6" autocomplete="new-password" required>
+                        <div class="form-text">At least 6 characters.</div>
+                    </div>
+
+                    <fieldset class="mb-4">
+                        <legend class="form-label">I am a...</legend>
+                        <div class="row g-2">
+                            <div class="col-6 role-option">
+                                <input type="radio" class="btn-check" name="role" id="renter" value="Renter" {{ 'checked' if form.role != 'Landlord' }}>
+                                <label class="btn" for="renter">
+                                    <i class="fas fa-search fa-lg d-block mb-2"></i>
+                                    <strong class="d-block">Renter</strong>
+                                    <small class="text-muted">Looking for a place</small>
+                                </label>
+                            </div>
+                            <div class="col-6 role-option">
+                                <input type="radio" class="btn-check" name="role" id="landlord" value="Landlord" {{ 'checked' if form.role == 'Landlord' }}>
+                                <label class="btn" for="landlord">
+                                    <i class="fas fa-key fa-lg d-block mb-2"></i>
+                                    <strong class="d-block">Landlord</strong>
+                                    <small class="text-muted">Have a place to rent out</small>
+                                </label>
                             </div>
                         </div>
+                    </fieldset>
 
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="fas fa-user-plus me-2"></i>Create Account
-                            </button>
-                        </div>
-                    </form>
-                </div>
-                <div class="card-footer text-center bg-light">
-                    <small class="text-muted">
-                        Already have an account? 
-                        <a href="{{ url_for('main.login') }}" class="text-decoration-none">
-                            <i class="fas fa-sign-in-alt me-1"></i>Sign in here
-                        </a>
-                    </small>
-                </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-dark btn-lg">Create account</button>
+                    </div>
+                </form>
             </div>
         </div>
+
+        <p class="text-center text-muted mt-3">
+            Already have an account?
+            <a href="{{ url_for('main.login') }}" class="fw-semibold text-decoration-none">Sign in</a>
+        </p>
     </div>
-
-    <style>
-        .role-card {
-            transition: all 0.3s ease;
-            border: 2px solid transparent;
-        }
-        
-        .role-card:hover {
-            border-color: var(--primary-color);
-            transform: translateY(-2px);
-        }
-        
-        .btn-check:checked + .btn {
-            background-color: var(--primary-color);
-            border-color: var(--primary-color);
-            color: white;
-        }
-        
-        .btn-check:checked + .btn .text-muted {
-            color: rgba(255, 255, 255, 0.8) !important;
-        }
-    </style>
 {% endblock %}
-

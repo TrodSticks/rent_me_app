@@ -1,118 +1,89 @@
 {% extends "base.html" %}
 {% block content %}
-    <div class="row">
-        <div class="col-12">
-            <!-- Conversation Header -->
-            <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5 class="mb-0">
-                                <i class="fas fa-comments me-2"></i>
-                                Conversation with {{ other_user.username }}
-                            </h5>
-                            <small class="text-light">
-                                <i class="fas fa-user me-1"></i>{{ other_user.role }}
-                                {% if property %}
-                                    <span class="ms-2">
-                                        <i class="fas fa-home me-1"></i>About:
-                                        <a href="{{ url_for('main.property_detail', property_id=property.id) }}" class="text-light fw-semibold">{{ property.title }}</a>
-                                        (P{{ property.price }}/month, {{ property.location }})
-                                    </span>
+    <div class="card mx-auto" style="max-width: 820px;">
+        <!-- Who and what this chat is about -->
+        <div class="card-header d-flex align-items-center gap-3">
+            <a href="{{ url_for('main.inbox') }}" class="rm-icon-btn flex-shrink-0" aria-label="Back to messages">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div class="rm-person">
+                <span class="rm-avatar">{{ other_user.username[0] }}</span>
+                <div>
+                    <strong>{{ other_user.username }}</strong>
+                    <small>
+                        {{ other_user.role }}
+                        {% if property %}
+                            &middot; About:
+                            <a href="{{ url_for('main.property_detail', property_id=property.id) }}" class="fw-semibold text-decoration-none">{{ property.title }}</a>
+                            (P{{ property.price }}/month, {{ property.location }})
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="chat-container">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="message-bubble {{ 'sent' if message.sender == current_user else 'received' }}">
+                        <div class="message-text">{{ message.content }}</div>
+                        <div class="message-meta">
+                            <small class="text-muted">
+                                {{ message.timestamp.strftime('%d %b, %H:%M') }}
+                                {% if message.sender == current_user %}
+                                    <i class="fas fa-check{{ '-double' if message.read }} ms-1" title="{{ 'Read' if message.read else 'Sent' }}"></i>
                                 {% endif %}
                             </small>
                         </div>
-                        <div>
-                            <a href="{{ url_for('main.inbox') }}" class="btn btn-light btn-sm">
-                                <i class="fas fa-arrow-left me-1"></i>Back to Inbox
-                            </a>
-                        </div>
                     </div>
+                {% endfor %}
+            {% else %}
+                <div class="rm-empty m-auto">
+                    <div class="rm-empty-icon"><i class="far fa-comments"></i></div>
+                    <h3>No messages yet</h3>
+                    <p class="text-muted mb-0">Start the conversation below.</p>
                 </div>
-            </div>
+            {% endif %}
+        </div>
 
-            <!-- Messages Container -->
-            <div class="card">
-                <div class="card-body p-0">
-                    <div class="chat-container" style="height: 500px; overflow-y: auto;">
-                        {% if messages %}
-                            {% for message in messages %}
-                                <div class="message-bubble {{ 'sent' if message.sender == current_user else 'received' }} p-3 m-3">
-                                    <div class="message-content">
-                                        <div class="message-text">
-                                            {{ message.content }}
-                                        </div>
-                                        <div class="message-meta">
-                                            <small class="text-muted">
-                                                <i class="fas fa-clock me-1"></i>
-                                                {{ message.timestamp.strftime('%Y-%m-%d %H:%M') }}
-                                                {% if message.sender == current_user %}
-                                                    <i class="fas fa-check ms-2 {{ 'text-primary' if message.read else 'text-muted' }}"></i>
-                                                {% endif %}
-                                            </small>
-                                        </div>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            <div class="text-center py-5">
-                                <i class="fas fa-comments fa-3x text-muted mb-3"></i>
-                                <h5>No messages yet</h5>
-                                <p class="text-muted">Start the conversation by sending a message below.</p>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-                
-                <!-- Message Input -->
-                <div class="card-footer">
-                    <form method="POST" action="{{ url_for('main.send_reply', recipient_id=other_user.id) }}" class="d-flex gap-2"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        {% if property %}<input type="hidden" name="property_id" value="{{ property.id }}">{% endif %}
-                        <div class="flex-grow-1">
-                            <textarea class="form-control" 
-                                      name="content" 
-                                      rows="2" 
-                                      placeholder="Type your message here..." 
-                                      required
-                                      style="resize: none;"></textarea>
-                        </div>
-                        <div class="align-self-end">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-paper-plane"></i>
-                                <span class="d-none d-md-inline ms-1">Send</span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
+        <!-- Reply -->
+        <div class="card-footer">
+            <form method="POST" action="{{ url_for('main.send_reply', recipient_id=other_user.id) }}" class="d-flex gap-2 align-items-end"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if property %}<input type="hidden" name="property_id" value="{{ property.id }}">{% endif %}
+                <textarea class="form-control" name="content" rows="1" placeholder="Type your message..."
+                          aria-label="Your message" required style="resize: none;"></textarea>
+                <button type="submit" class="rm-square-btn blue flex-shrink-0" style="height: 48px; min-width: 48px; border-radius: 14px;" aria-label="Send">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </form>
         </div>
     </div>
 
     <script>
-        // Auto-scroll to bottom of chat
         document.addEventListener('DOMContentLoaded', function() {
+            // Start at the newest message
             const chatContainer = document.querySelector('.chat-container');
             if (chatContainer) {
                 chatContainer.scrollTop = chatContainer.scrollHeight;
             }
-            
-            // Auto-resize textarea
+
             const textarea = document.querySelector('textarea[name="content"]');
             if (textarea) {
+                // Grow with the text, up to a few lines
                 textarea.addEventListener('input', function() {
                     this.style.height = 'auto';
                     this.style.height = Math.min(this.scrollHeight, 120) + 'px';
                 });
-                
+
                 // Submit on Ctrl+Enter
                 textarea.addEventListener('keydown', function(e) {
                     if (e.ctrlKey && e.key === 'Enter') {
                         e.preventDefault();
-                        this.closest('form').submit();
+                        this.closest('form').requestSubmit();
                     }
                 });
             }
         });
     </script>
 {% endblock %}
-

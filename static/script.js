@@ -1,8 +1,8 @@
 // Enhanced functionality for Rent Me application
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Auto-hide alerts after 5 seconds
-    const alerts = document.querySelectorAll('.alert');
+    // Auto-hide flash messages after 5 seconds (not notes that are part of the page)
+    const alerts = document.querySelectorAll('.alert-dismissible');
     alerts.forEach(alert => {
         setTimeout(() => {
             if (alert) {
@@ -61,13 +61,15 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(response => response.json())
             .then(data => {
-                if (data.is_favorited) {
-                    this.innerHTML = '<i class="fas fa-heart text-danger"></i>';
-                    this.title = 'Remove from favorites';
-                } else {
-                    this.innerHTML = '<i class="far fa-heart"></i>';
-                    this.title = 'Add to favorites';
+                if (data.error) {
+                    throw new Error(data.error);
                 }
+                const label = data.is_favorited ? 'Remove from favorites' : 'Add to favorites';
+                this.innerHTML = data.is_favorited
+                    ? '<i class="fas fa-heart text-danger"></i>'
+                    : '<i class="far fa-heart"></i>';
+                this.title = label;
+                this.setAttribute('aria-label', label);
             })
             .catch(error => {
                 console.error('Error:', error);

@@ -10,3 +10,4 @@ static/property_pics/*
 .pytest_cache/
 .claude/
 .secret_key
+*.db.bak

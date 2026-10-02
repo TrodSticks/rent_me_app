@@ -1,3 +1,4 @@
+import math
 import os
 import re
 import secrets
@@ -6,10 +7,10 @@ from flask import render_template, url_for, flash, redirect, request, Blueprint,
 from flask_login import login_user, current_user, logout_user, login_required
 from flask_wtf.csrf import CSRFError
 from PIL import Image, ImageOps, UnidentifiedImageError
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 from app import db
 from models import User, Property, Message, Favorite
-from search_engine import PropertySearchEngine, LOCATIONS
+from search_engine import PropertySearchEngine, LOCATIONS, TOWN_COORDS
 from llm_parser import LLMQueryParser
 
 bp = Blueprint("main", __name__)
@@ -25,6 +26,9 @@ SORT_OPTIONS = {
 }
 
 PER_PAGE = 12  # listings per page on the home page
+PIN_SPREAD_DEGREES = 0.012  # about 1.3 km between approximate map pins in the same town
+MAX_PIN_DISTANCE_KM = 40    # how far a landlord's pin may be from the town they chose
+MAX_PINS_PER_REQUEST = 300  # most pins the map loads for one view
 SIMILAR_COUNT = 3
 
 MIN_PASSWORD_LENGTH = 6
@@ -35,7 +39,7 @@ ROLES = ('Renter', 'Landlord')
 
 @bp.app_context_processor
 def inject_locations():
-    return {'locations': LOCATIONS}
+    return {'locations': LOCATIONS, 'town_coords': TOWN_COORDS}
 
 
 @bp.app_errorhandler(413)
@@ -125,6 +129,19 @@ def _apply_property_form(property):
     if property_type not in ("house", "flat"):
         return "Please choose a property type."
 
+    # Optional map pin: both numbers or neither, and it has to be in or near the chosen town
+    raw_lat, raw_lng = form.get("latitude", "").strip(), form.get("longitude", "").strip()
+    latitude = longitude = None
+    if raw_lat or raw_lng:
+        try:
+            latitude, longitude = float(raw_lat), float(raw_lng)
+        except ValueError:
+            return "The map pin couldn't be read. Please place it again."
+        if not (math.isfinite(latitude) and math.isfinite(longitude)):
+            return "The map pin couldn't be read. Please place it again."
+        if distance_km((latitude, longitude), TOWN_COORDS[location]) > MAX_PIN_DISTANCE_KM:
+            return f"The map pin is too far from {location}. Move the pin, or choose the town it's in."
+
     image = request.files.get("image")
     if image and image.filename:
         filename = save_picture(image)
@@ -139,14 +156,22 @@ def _apply_property_form(property):
     property.bedrooms = bedrooms
     property.location = location
     property.property_type = property_type
+    property.latitude = round(latitude, 6) if latitude is not None else None
+    property.longitude = round(longitude, 6) if longitude is not None else None
     return None
+
+
+def distance_km(a, b):
+    """Rough distance between two (latitude, longitude) points. Accurate enough within a town."""
+    north = (a[0] - b[0]) * 111.0
+    east = (a[1] - b[1]) * 111.0 * math.cos(math.radians((a[0] + b[0]) / 2))
+    return math.hypot(north, east)
 
 
 # ---------- Browsing & search ----------
 
-@bp.route("/")
-@bp.route("/home")
-def home():
+def read_filters():
+    """The search text and filters in the URL."""
     search_query = request.args.get('search', '').strip()
     filters = {
         'property_type': request.args.get('property_type', ''),
@@ -156,7 +181,18 @@ def home():
         'max_price': request.args.get('max_price', type=int),
         'sort': request.args.get('sort', 'newest'),
     }
+    filters_active = bool(search_query) or any(
+        filters[k] for k in ('property_type', 'location', 'bedrooms', 'min_price', 'max_price')
+    )
+    # Filters tucked away in the panel (type has its own chips, so it doesn't count)
+    panel_filters = sum(1 for k in ('location', 'bedrooms', 'min_price', 'max_price') if filters[k]) \
+        + (filters['sort'] in ('price_asc', 'price_desc'))
+    return {'search_query': search_query, 'filters': filters,
+            'filters_active': filters_active, 'panel_filters': panel_filters}
 
+
+def filtered_query(filters):
+    """A database query with the drop-down filters applied (not the text search or sorting)."""
     query = Property.query
     if filters['property_type'] in ('house', 'flat'):
         query = query.filter(Property.property_type == filters['property_type'])
@@ -172,30 +208,164 @@ def home():
         query = query.filter(Property.price >= filters['min_price'])
     if filters['max_price']:
         query = query.filter(Property.price <= filters['max_price'])
-    properties = query.order_by(SORT_OPTIONS.get(filters['sort'], SORT_OPTIONS['newest'])).all()
+    return query
 
-    if search_query:
-        search_params = search_engine.parse_query(search_query)
-        properties = search_engine.filter_properties(properties, search_params)
 
-    filters_active = bool(search_query) or any(
-        filters[k] for k in ('property_type', 'location', 'bedrooms', 'min_price', 'max_price')
-    )
+def text_search(properties, search_query):
+    """Narrow a list of properties with the plain-English search."""
+    if not search_query:
+        return properties
+    return search_engine.filter_properties(properties, search_engine.parse_query(search_query))
+
+
+def search_from_request():
+    """Run the search and filters in the URL and return every match, sorted."""
+    search = read_filters()
+    filters = search['filters']
+    properties = filtered_query(filters) \
+        .order_by(SORT_OPTIONS.get(filters['sort'], SORT_OPTIONS['newest'])).all()
+    search['properties'] = text_search(properties, search['search_query'])
+    return search
+
+
+def filter_url(endpoint="main.home", **changes):
+    """The current search on another view or with some filters changed; an empty value removes a filter."""
+    args = request.args.to_dict()
+    for transient in ('page', 'focus'):
+        args.pop(transient, None)
+    for key, value in changes.items():
+        if value in (None, ''):
+            args.pop(key, None)
+        else:
+            args[key] = value
+    return url_for(endpoint, **args)
+
+
+@bp.app_context_processor
+def inject_filter_url():
+    return {'filter_url': filter_url}
+
+
+@bp.route("/")
+@bp.route("/home")
+def home():
+    search = search_from_request()
 
     # Text search filters in Python, so page the final list rather than the SQL query
+    properties = search.pop('properties')
     total = len(properties)
     pages = max(1, -(-total // PER_PAGE))
     page = min(max(request.args.get('page', 1, type=int), 1), pages)
     properties = properties[(page - 1) * PER_PAGE:page * PER_PAGE]
 
-    def page_url(number):
-        args = request.args.to_dict()
-        args['page'] = number
-        return url_for("main.home", **args)
+    return render_template("home.html", properties=properties, total=total, page=page, pages=pages,
+                           page_url=lambda number: filter_url(page=number), **search)
 
-    return render_template("home.html", properties=properties, search_query=search_query,
-                           filters=filters, filters_active=filters_active,
-                           total=total, page=page, pages=pages, page_url=page_url)
+
+# ---------- Map ----------
+
+def pin_position(property):
+    """Where a property goes on the map: (latitude, longitude, exact).
+
+    A landlord's pin is used as it is. Without one, the property is placed near its town
+    centre at a spot worked out from its id, so it stays put between visits and filters.
+    """
+    if property.latitude is not None and property.longitude is not None:
+        return property.latitude, property.longitude, True
+    centre = TOWN_COORDS.get(property.location)
+    if not centre:
+        return None
+    angle = math.radians(property.id * 137.5)            # golden angle keeps neighbours apart
+    radius = PIN_SPREAD_DEGREES * math.sqrt(property.id % 12 + 1)
+    return (round(centre[0] + radius * math.sin(angle), 5),
+            round(centre[1] + radius * math.cos(angle), 5), False)
+
+
+def make_pin(property):
+    position = pin_position(property)
+    if not position:
+        return None
+    return {
+        'id': property.id,
+        'title': property.title,
+        'price': property.price,
+        'bedrooms': property.bedrooms,
+        'type': 'Flat' if property.property_type == 'flat' else 'House',
+        'town': property.location,
+        'lat': position[0],
+        'lng': position[1],
+        'exact': position[2],
+        'photo': url_for('static', filename='property_pics/' + property.image_file),
+        'url': url_for('main.property_detail', property_id=property.id),
+    }
+
+
+def town_counts(search):
+    """How many matching properties each town has, for the bubbles and the town chooser."""
+    query = filtered_query(search['filters'])
+    if search['search_query']:
+        # The plain-English search runs in Python, so count after it
+        counts = {}
+        for property in text_search(query.all(), search['search_query']):
+            counts[property.location] = counts.get(property.location, 0) + 1
+    else:
+        counts = dict(query.with_entities(Property.location, func.count(Property.id))
+                      .group_by(Property.location).all())
+    return [{'name': name, 'lat': lat, 'lng': lng, 'count': counts.get(name, 0)}
+            for name, (lat, lng) in TOWN_COORDS.items() if counts.get(name)]
+
+
+@bp.route("/map")
+def map_view():
+    search = read_filters()
+    towns = town_counts(search)
+
+    # Opening on one property: /map?focus=<id>, used by "View on map"
+    focus = None
+    focus_property = db.session.get(Property, request.args.get('focus', type=int) or 0)
+    if focus_property:
+        focus = make_pin(focus_property)
+
+    return render_template("map.html", title="Map", towns=towns, focus=focus,
+                           total=sum(town['count'] for town in towns),
+                           town_centres=[{'name': name, 'lat': lat, 'lng': lng}
+                                         for name, (lat, lng) in TOWN_COORDS.items()],
+                           **search)
+
+
+@bp.route("/api/map-pins")
+def map_pins_api():
+    """The matching properties inside the visible part of the map.
+
+    bbox is south,west,north,east. At most MAX_PINS_PER_REQUEST pins come back; `total`
+    says how many there are, so the page can ask the visitor to zoom in.
+    """
+    try:
+        south, west, north, east = (float(part) for part in request.args.get('bbox', '').split(','))
+    except ValueError:
+        return jsonify({"error": "bbox must be south,west,north,east"}), 400
+    if not all(math.isfinite(v) for v in (south, west, north, east)) or south > north or west > east:
+        return jsonify({"error": "bbox must be south,west,north,east"}), 400
+
+    search = read_filters()
+    # Approximate pins sit within a few km of their town centre, so only towns near the view can matter
+    margin = PIN_SPREAD_DEGREES * 4
+    nearby_towns = [name for name, (lat, lng) in TOWN_COORDS.items()
+                    if south - margin <= lat <= north + margin and west - margin <= lng <= east + margin]
+    in_view = or_(
+        and_(Property.latitude.between(south, north), Property.longitude.between(west, east)),
+        and_(Property.latitude.is_(None), Property.location.in_(nearby_towns)),
+    )
+    properties = filtered_query(search['filters']).filter(in_view).order_by(Property.id.desc()).all()
+    properties = text_search(properties, search['search_query'])
+
+    pins = [pin for pin in (make_pin(p) for p in properties)
+            if pin and south <= pin['lat'] <= north and west <= pin['lng'] <= east]
+    return jsonify({
+        'pins': pins[:MAX_PINS_PER_REQUEST],
+        'total': len(pins),
+        'truncated': len(pins) > MAX_PINS_PER_REQUEST,
+    })
 
 @bp.route("/api/search-suggestions")
 def search_suggestions():
@@ -327,7 +497,7 @@ def dashboard():
             p.id: Message.query.filter_by(property_id=p.id, recipient_id=current_user.id).count()
             for p in properties
         }
-        return render_template("landlord_dashboard.html", properties=properties,
+        return render_template("landlord_dashboard.html", title="Dashboard", properties=properties,
                                message_counts=message_counts)
     else:
         flash("You do not have access to this page.", "danger")
@@ -450,7 +620,7 @@ def favorites():
 
     favorites = Favorite.query.filter_by(user_id=current_user.id).all()
     properties = [fav.property for fav in favorites]
-    return render_template("favorites.html", properties=properties)
+    return render_template("favorites.html", title="Favorites", properties=properties)
 
 
 # ---------- Messaging ----------
@@ -525,7 +695,7 @@ def inbox():
             conversations = [c for c in conversations
                              if c['property'] and c['property'].id == selected_property.id]
 
-    return render_template("inbox.html", title="Inbox", conversations=conversations,
+    return render_template("inbox.html", title="Messages", conversations=conversations,
                            unread_count=unread_count, my_properties=my_properties,
                            selected_property=selected_property)
 
@@ -548,7 +718,8 @@ def conversation(user_id):
                             property_id=property_id, read=False).update({'read': True})
     db.session.commit()
 
-    return render_template("conversation.html", messages=messages, other_user=other_user, property=property)
+    return render_template("conversation.html", title=f"Chat with {other_user.username}", messages=messages,
+                           other_user=other_user, property=property)
 
 @bp.route("/send_reply/<int:recipient_id>", methods=["POST"])
 @login_required

@@ -10,11 +10,13 @@ A full-stack web application for property rentals in Botswana, featuring AI-powe
 - **Property Management**: Full CRUD operations for landlords
 - **Favorites System**: Renters can save favorite properties
 - **Private Messaging**: Two-way communication between renters and landlords
-- **Responsive Design**: Modern, mobile-friendly interface
+- **Responsive Design**: Mobile-first interface with a bottom navigation bar on phones
+- **Brand**: Rent Me icon and colour palette (Electric Blue `#0D6EFD`, Deep Navy `#0F172A`); all colours are defined once at the top of `static/style.css`
 
 ### For Landlords
 - Dashboard with property statistics and a message count per listing
 - Add, edit, and delete property listings, with photo upload (JPG, PNG, GIF, WebP up to 5 MB)
+- Mark a property's exact spot on a map (optional; without it the listing shows somewhere in its town)
 - Manage property details (type, location, bedrooms, price)
 - Receive and respond to messages, grouped by property, with an inbox filter per listing
 
@@ -22,6 +24,7 @@ A full-stack web application for property rentals in Botswana, featuring AI-powe
 - Browse all available properties
 - Filter by type, town, bedrooms and price range, and sort by price or newest
 - AI-powered search with natural language queries
+- Map view: opens on your last town (or asks you to pick one), shows a price pin for each property, groups pins that overlap, and loads only the part of the map on screen. Same search and filters as the list
 - Save favorite properties
 
 ### For Everyone
@@ -75,6 +78,20 @@ A full-stack web application for property rentals in Botswana, featuring AI-powe
 6. **Access the application**
    Open your browser and go to `http://localhost:5000`
 
+### Database changes (migrations)
+
+The app keeps its database up to date by itself: every time it starts, it applies any
+changes in `migrations/versions/` that the database hasn't had yet. Existing data is kept.
+
+When you change `models.py` (for example, add a column), create a migration for it:
+
+```bash
+flask --app app db migrate -m "describe the change"
+```
+
+Check the new file in `migrations/versions/`, then start the app as usual to apply it.
+Set `AUTO_MIGRATE=0` if you would rather run `flask --app app db upgrade` by hand.
+
 ### Settings (environment variables)
 
 | Variable | What it does | Default |
@@ -84,6 +101,7 @@ A full-stack web application for property rentals in Botswana, featuring AI-powe
 | `DATABASE_URL` | Database connection string | Local `app.db` SQLite file |
 | `HOST` / `PORT` | Address and port the app listens on | `0.0.0.0` / `5000` |
 | `USE_LLM_SEARCH` | Set to `1` to turn on the optional AI search model | Off |
+| `AUTO_MIGRATE` | Set to `0` to stop the app updating the database when it starts | On |
 
 ## Demo Accounts
 
@@ -126,8 +144,12 @@ rent_me_app/
 ├── download_model.py     # Downloads the optional LLM model
 ├── create_sample_data.py # Sample data generator
 ├── requirements.txt      # Python dependencies
+├── migrations/           # Database changes, applied automatically at startup
 ├── tests/                # Pytest test suite
 ├── templates/            # HTML templates
+│   ├── _macros.html      # Shared pieces such as the property card
+│   ├── _search_controls.html  # Search box, chips and filters (list and map)
+│   ├── map.html
 │   ├── base.html
 │   ├── account.html
 │   ├── home.html
@@ -141,8 +163,12 @@ rent_me_app/
 │   ├── conversation.html
 │   └── send_message.html
 └── static/              # Static files
-    ├── style.css        # Custom CSS
+    ├── style.css        # Design system: palette, components
+    ├── manifest.webmanifest  # Lets phones add the app to the home screen
+    ├── icons/           # App icon (SVG and PNG sizes)
     ├── script.js        # JavaScript functionality
+    ├── map.js           # Map view (Leaflet + OpenStreetMap)
+    ├── pin_picker.js    # Property form: mark a location on a map
     └── property_pics/   # Property images
         └── default.jpg  # Default property image
 ```

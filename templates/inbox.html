@@ -1,117 +1,75 @@
 {% extends "base.html" %}
+{% from "_macros.html" import photo_url, default_photo, empty_state with context %}
 {% block content %}
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
-        <h1 class="mb-0"><i class="fas fa-inbox me-2"></i>Your Messages</h1>
+    <div class="section-title mt-2">
+        <h1>Messages</h1>
         {% if unread_count > 0 %}
-            <span class="badge bg-danger fs-6">{{ unread_count }} unread</span>
+            <span class="rm-tag red">{{ unread_count }} unread</span>
         {% endif %}
     </div>
 
     {% if my_properties %}
         <!-- Landlords: show messages about one listing -->
-        <form method="GET" action="{{ url_for('main.inbox') }}" class="row g-2 align-items-center mb-4">
-            <div class="col-auto">
-                <label for="property-filter" class="col-form-label">
-                    <i class="fas fa-home me-1"></i>Show messages about:
-                </label>
-            </div>
-            <div class="col-auto">
-                <select class="form-select" id="property-filter" name="property_id" onchange="this.form.submit()">
-                    <option value="">All properties</option>
-                    {% for p in my_properties %}
-                        <option value="{{ p.id }}" {{ 'selected' if selected_property and selected_property.id == p.id }}>{{ p.title }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <noscript><div class="col-auto"><button class="btn btn-primary">Show</button></div></noscript>
+        <form method="GET" action="{{ url_for('main.inbox') }}" class="mb-3" style="max-width: 420px;">
+            <label for="property-filter" class="form-label">Show messages about</label>
+            <select class="form-select" id="property-filter" name="property_id" onchange="this.form.submit()">
+                <option value="">All properties</option>
+                {% for p in my_properties %}
+                    <option value="{{ p.id }}" {{ 'selected' if selected_property and selected_property.id == p.id }}>{{ p.title }}</option>
+                {% endfor %}
+            </select>
+            <noscript><button class="btn btn-dark mt-2">Show</button></noscript>
         </form>
     {% endif %}
 
     {% if conversations %}
-        <div class="row">
-            {% for thread in conversations %}
-                {% set other_user = thread.user %}
-                {% set latest_message = thread.latest %}
-                <div class="col-12 mb-3">
-                    <div class="card message-item {{ 'message-unread' if thread.unread > 0 else '' }}">
-                        <div class="card-body">
-                            <div class="row align-items-center">
-                                <div class="col-md-8">
-                                    <div class="d-flex align-items-center mb-2">
-                                        {% if thread.property %}
-                                            <img src="{{ url_for('static', filename='property_pics/' + thread.property.image_file) }}"
-                                                 alt="" class="rounded me-3" style="width: 56px; height: 56px; object-fit: cover;"
-                                                 onerror="this.src='{{ url_for('static', filename='property_pics/default.jpg') }}'">
-                                        {% else %}
-                                            <i class="fas fa-user-circle fa-2x text-primary me-3"></i>
-                                        {% endif %}
-                                        <div>
-                                            <h6 class="mb-0 fw-bold">{{ other_user.username }}</h6>
-                                            <small class="text-muted">
-                                                <i class="fas fa-tag me-1"></i>{{ other_user.role }}
-                                            </small>
-                                            <div>
-                                                {% if thread.property %}
-                                                    <a href="{{ url_for('main.property_detail', property_id=thread.property.id) }}" class="badge bg-light text-dark border text-decoration-none">
-                                                        <i class="fas fa-home me-1"></i>{{ thread.property.title }}
-                                                    </a>
-                                                {% else %}
-                                                    <span class="badge bg-light text-muted border">General message</span>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <p class="mb-1 text-muted">
-                                        <strong>{{ 'You' if latest_message.sender == current_user else latest_message.sender.username }}:</strong>
-                                        {{ latest_message.content[:100] }}{% if latest_message.content|length > 100 %}...{% endif %}
-                                    </p>
-                                </div>
-                                <div class="col-md-4 text-md-end">
-                                    <div class="mb-2">
-                                        <small class="text-muted">
-                                            <i class="fas fa-clock me-1"></i>
-                                            {{ latest_message.timestamp.strftime('%Y-%m-%d %H:%M') }}
-                                        </small>
-                                    </div>
-                                    {% if thread.unread > 0 %}
-                                        <span class="badge bg-danger mb-2">{{ thread.unread }} new</span>
-                                    {% endif %}
-                                    <div>
-                                        <a href="{{ url_for('main.conversation', user_id=other_user.id, property_id=thread.property.id if thread.property else None) }}"
-                                           class="btn btn-primary btn-sm">
-                                            <i class="fas fa-comments me-1"></i>View Chat
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+        {% for thread in conversations %}
+            {% set other_user = thread.user %}
+            {% set latest_message = thread.latest %}
+            <a class="rm-row message-item text-decoration-none text-reset {{ 'message-unread' if thread.unread > 0 else '' }}"
+               href="{{ url_for('main.conversation', user_id=other_user.id, property_id=thread.property.id if thread.property else None) }}">
+                {% if thread.property %}
+                    <img class="rm-row-thumb" src="{{ photo_url(thread.property) }}" alt="" loading="lazy"
+                         onerror="this.onerror=null;this.src='{{ default_photo() }}'">
+                {% else %}
+                    <span class="rm-avatar lg">{{ other_user.username[0] }}</span>
+                {% endif %}
+                <div class="rm-row-main">
+                    <h6>{{ other_user.username }} <span class="rm-tag ms-1">{{ other_user.role }}</span></h6>
+                    <div class="mb-1">
+                        {% if thread.property %}
+                            <span class="rm-tag blue"><i class="fas fa-home"></i>{{ thread.property.title }}</span>
+                        {% else %}
+                            <span class="rm-tag">General message</span>
+                        {% endif %}
                     </div>
+                    <p>
+                        <strong>{{ 'You' if latest_message.sender == current_user else latest_message.sender.username }}:</strong>
+                        {{ latest_message.content[:100] }}{% if latest_message.content|length > 100 %}...{% endif %}
+                    </p>
                 </div>
-            {% endfor %}
-        </div>
+                <div class="rm-row-side">
+                    <small class="text-muted">{{ latest_message.timestamp.strftime('%d %b, %H:%M') }}</small>
+                    {% if thread.unread > 0 %}
+                        <div><span class="rm-tag red mt-1">{{ thread.unread }} new</span></div>
+                    {% endif %}
+                </div>
+            </a>
+        {% endfor %}
 
     {% elif selected_property %}
-        <div class="text-center py-5">
-            <i class="fas fa-inbox fa-4x text-muted mb-4"></i>
-            <h3>No messages about this property yet</h3>
+        {% call empty_state('far fa-envelope', 'No messages about this property yet') %}
             <a href="{{ url_for('main.inbox') }}" class="btn btn-primary mt-2">Show all messages</a>
-        </div>
+        {% endcall %}
 
     {% else %}
-        <div class="text-center py-5">
-            <i class="fas fa-inbox fa-4x text-muted mb-4"></i>
-            <h3>No messages yet</h3>
-            <p class="text-muted mb-4">Your conversations will appear here when you start messaging with landlords or renters.</p>
-
+        {% call empty_state('far fa-envelope', 'No messages yet') %}
+            <p class="text-muted">Your conversations will appear here.</p>
             {% if current_user.role == "Renter" %}
-                <a href="{{ url_for('main.home') }}" class="btn btn-primary">
-                    <i class="fas fa-search me-2"></i>Browse Properties
-                </a>
+                <a href="{{ url_for('main.home') }}" class="btn btn-primary">Browse properties</a>
             {% else %}
-                <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary">
-                    <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
-                </a>
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary">Go to dashboard</a>
             {% endif %}
-        </div>
+        {% endcall %}
     {% endif %}
 {% endblock %}

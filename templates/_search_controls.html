@@ -1,0 +1,107 @@
+{# Search box, type chips and filter panel. Shared by the list and map views.
+   Expects: view (endpoint the forms submit to), filters, search_query, panel_filters, locations. #}
+<div class="search-container">
+    <form method="GET" action="{{ url_for(view) }}" id="search-form" class="rm-search" role="search">
+        {# Keep the chosen filters when running a text search #}
+        {% for key in ['property_type', 'location', 'bedrooms', 'min_price', 'max_price', 'sort'] %}
+            {% if filters[key] %}<input type="hidden" name="{{ key }}" value="{{ filters[key] }}">{% endif %}
+        {% endfor %}
+        <div class="rm-search-field">
+            <i class="fas fa-search"></i>
+            <input type="text"
+                   class="form-control search-input"
+                   id="search-input"
+                   name="search"
+                   value="{{ search_query }}"
+                   placeholder="Try 'cheap 2 bedroom house in Gaborone'"
+                   aria-label="Search properties"
+                   autocomplete="off">
+        </div>
+        <button class="rm-square-btn {{ 'has-filters' if panel_filters }}" type="button"
+                data-bs-toggle="collapse" data-bs-target="#filter-panel"
+                aria-expanded="false" aria-controls="filter-panel"
+                aria-label="Filters{% if panel_filters %} ({{ panel_filters }} active){% endif %}">
+            <i class="fas fa-sliders-h"></i>
+        </button>
+        <button class="rm-square-btn blue d-none d-sm-inline-flex" type="submit">
+            <span>Search</span>
+        </button>
+    </form>
+    <div id="search-suggestions" class="search-suggestions"></div>
+</div>
+
+<!-- Property type chips -->
+<div class="rm-chips" role="group" aria-label="Property type">
+    <a class="rm-chip {{ 'active' if filters.property_type not in ['house', 'flat'] }}" href="{{ filter_url(view, property_type=None) }}">All</a>
+    <a class="rm-chip {{ 'active' if filters.property_type == 'house' }}" href="{{ filter_url(view, property_type='house') }}">House</a>
+    <a class="rm-chip {{ 'active' if filters.property_type == 'flat' }}" href="{{ filter_url(view, property_type='flat') }}">Flat / Apartment</a>
+</div>
+
+<!-- Filters in use: tap one to remove it -->
+{% if filters_active %}
+    <div class="d-flex flex-wrap gap-2 mb-3" aria-label="Active filters">
+        {% if filters.location %}
+            <a class="rm-tag blue" href="{{ filter_url(view, location=None) }}" aria-label="Remove town filter">{{ filters.location }}<i class="fas fa-times"></i></a>
+        {% endif %}
+        {% if filters.bedrooms %}
+            <a class="rm-tag blue" href="{{ filter_url(view, bedrooms=None) }}" aria-label="Remove bedrooms filter">{{ '5+' if filters.bedrooms >= 5 else filters.bedrooms }} bed{{ 's' if filters.bedrooms != 1 }}<i class="fas fa-times"></i></a>
+        {% endif %}
+        {% if filters.min_price %}
+            <a class="rm-tag blue" href="{{ filter_url(view, min_price=None) }}" aria-label="Remove minimum price">From P{{ '{:,}'.format(filters.min_price) }}<i class="fas fa-times"></i></a>
+        {% endif %}
+        {% if filters.max_price %}
+            <a class="rm-tag blue" href="{{ filter_url(view, max_price=None) }}" aria-label="Remove maximum price">Up to P{{ '{:,}'.format(filters.max_price) }}<i class="fas fa-times"></i></a>
+        {% endif %}
+        {% if filters.sort in ['price_asc', 'price_desc'] %}
+            <a class="rm-tag blue" href="{{ filter_url(view, sort=None) }}" aria-label="Remove sorting">{{ 'Cheapest first' if filters.sort == 'price_asc' else 'Most expensive first' }}<i class="fas fa-times"></i></a>
+        {% endif %}
+        <a class="rm-tag" href="{{ url_for(view) }}"><i class="fas fa-times"></i>Clear all</a>
+    </div>
+{% endif %}
+
+<!-- More filters -->
+<div class="collapse" id="filter-panel">
+    <form method="GET" action="{{ url_for(view) }}" class="rm-filter-panel" id="filter-form">
+        {% if search_query %}<input type="hidden" name="search" value="{{ search_query }}">{% endif %}
+        {% if filters.property_type in ['house', 'flat'] %}<input type="hidden" name="property_type" value="{{ filters.property_type }}">{% endif %}
+        <div class="row g-3 align-items-end">
+            <div class="col-6 col-md-3">
+                <label for="filter-location" class="form-label">Town</label>
+                <select class="form-select" id="filter-location" name="location">
+                    <option value="">Any town</option>
+                    {% for town in locations %}
+                        <option value="{{ town }}" {{ 'selected' if filters.location == town }}>{{ town }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="filter-bedrooms" class="form-label">Bedrooms</label>
+                <select class="form-select" id="filter-bedrooms" name="bedrooms">
+                    <option value="">Any</option>
+                    {% for n in range(1, 5) %}
+                        <option value="{{ n }}" {{ 'selected' if filters.bedrooms == n }}>{{ n }}</option>
+                    {% endfor %}
+                    <option value="5" {{ 'selected' if filters.bedrooms and filters.bedrooms >= 5 }}>5+</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="filter-min">Price per month (P)</label>
+                <div class="d-flex gap-2">
+                    <input type="number" class="form-control" id="filter-min" name="min_price" min="0" placeholder="Min" value="{{ filters.min_price or '' }}">
+                    <input type="number" class="form-control" name="max_price" min="0" placeholder="Max" aria-label="Maximum price" value="{{ filters.max_price or '' }}">
+                </div>
+            </div>
+            <div class="col-12 col-md-2">
+                <label for="filter-sort" class="form-label">Sort by</label>
+                <select class="form-select" id="filter-sort" name="sort">
+                    <option value="newest" {{ 'selected' if filters.sort == 'newest' }}>Newest</option>
+                    <option value="price_asc" {{ 'selected' if filters.sort == 'price_asc' }}>Price: low to high</option>
+                    <option value="price_desc" {{ 'selected' if filters.sort == 'price_desc' }}>Price: high to low</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-2 d-grid">
+                <button type="submit" class="btn btn-dark">Apply</button>
+            </div>
+        </div>
+    </form>
+</div>

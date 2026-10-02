@@ -1,64 +1,88 @@
 {% extends "base.html" %}
+{% block head %}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+{% endblock %}
 {% block content %}
     <div class="content-section">
         <form method="POST" action="" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <fieldset class="form-group">
+            <fieldset>
                 <legend class="border-bottom mb-4">{{ title }}</legend>
-                <div class="form-group mb-3">
+                <div class="mb-3">
                     <label for="title" class="form-label">Title</label>
-                    <input type="text" class="form-control" id="title" name="title" required maxlength="100" value="{{ values.title or '' }}">
+                    <input type="text" class="form-control" id="title" name="title" required maxlength="100"
+                           placeholder="e.g. Modern 2 bedroom flat near Main Mall" value="{{ values.title or '' }}">
                 </div>
-                <div class="form-group mb-3">
+                <div class="mb-3">
                     <label for="description" class="form-label">Description</label>
-                    <textarea class="form-control" id="description" name="description" rows="5" required>{{ values.description or '' }}</textarea>
+                    <textarea class="form-control" id="description" name="description" rows="5" required
+                              placeholder="What makes this place a good home?">{{ values.description or '' }}</textarea>
                 </div>
-                <div class="form-group mb-3">
-                    <label for="property_type" class="form-label">Property Type</label>
-                    <select class="form-control" id="property_type" name="property_type" required>
-                        <option value="">Select Property Type</option>
-                        <option value="house" {{ 'selected' if values.property_type == 'house' else '' }}>House</option>
-                        <option value="flat" {{ 'selected' if values.property_type == 'flat' else '' }}>Flat/Apartment</option>
-                    </select>
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-6">
+                        <label for="property_type" class="form-label">Property type</label>
+                        <select class="form-select" id="property_type" name="property_type" required>
+                            <option value="">Select type</option>
+                            <option value="house" {{ 'selected' if values.property_type == 'house' else '' }}>House</option>
+                            <option value="flat" {{ 'selected' if values.property_type == 'flat' else '' }}>Flat/Apartment</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-6">
+                        <label for="location" class="form-label">Town</label>
+                        <select class="form-select" id="location" name="location" required>
+                            <option value="">Select town</option>
+                            {% for town in locations %}
+                                <option value="{{ town }}" {{ 'selected' if values.location == town else '' }}>{{ town }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-sm-6">
+                        <label for="price" class="form-label">Rent per month (Pula)</label>
+                        <input type="number" class="form-control" id="price" name="price" min="1" required value="{{ values.price or '' }}">
+                    </div>
+                    <div class="col-sm-6">
+                        <label for="bedrooms" class="form-label">Bedrooms</label>
+                        <input type="number" class="form-control" id="bedrooms" name="bedrooms" min="1" max="10" required value="{{ values.bedrooms or '' }}">
+                    </div>
                 </div>
-                <div class="form-group mb-3">
-                    <label for="price" class="form-label">Price (Pula per month)</label>
-                    <input type="number" class="form-control" id="price" name="price" min="1" required value="{{ values.price or '' }}">
+                <div class="mb-4">
+                    <span class="form-label d-block" id="pin-label">Location on the map <span class="text-muted fw-normal">(optional)</span></span>
+                    <div id="pin-map" class="rm-pin-map" role="application" aria-labelledby="pin-label"></div>
+                    <input type="hidden" name="latitude" id="latitude" value="{{ values.latitude or '' }}">
+                    <input type="hidden" name="longitude" id="longitude" value="{{ values.longitude or '' }}">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                        <span class="rm-tag" id="pin-status">No pin placed</span>
+                        <button type="button" class="btn btn-light btn-sm" id="pin-clear" hidden>Remove pin</button>
+                    </div>
+                    <div class="form-text">
+                        Tap the map to mark where the property is, and drag the pin to adjust it. Renters see this spot on the map.
+                        Without a pin, the listing is shown somewhere in the town you chose.
+                    </div>
                 </div>
-                <div class="form-group mb-3">
-                    <label for="location" class="form-label">Location</label>
-                    <select class="form-control" id="location" name="location" required>
-                        <option value="">Select Location</option>
-                        {% for town in locations %}
-                            <option value="{{ town }}" {{ 'selected' if values.location == town else '' }}>{{ town }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="form-group mb-3">
-                    <label for="bedrooms" class="form-label">Number of Bedrooms</label>
-                    <input type="number" class="form-control" id="bedrooms" name="bedrooms" min="1" max="10" required value="{{ values.bedrooms or '' }}">
-                </div>
-                <div class="form-group mb-3">
+                <div class="mb-4">
                     <label for="image" class="form-label">Photo</label>
                     {% if property and property.image_file and property.image_file != 'default.jpg' %}
                         <div class="mb-2">
                             <img src="{{ url_for('static', filename='property_pics/' + property.image_file) }}"
-                                 alt="Current photo" class="rounded" style="height: 120px; object-fit: cover;">
+                                 alt="Current photo" style="height: 140px; border-radius: 18px; object-fit: cover;">
                             <div class="form-text">Current photo. Choose a new file to replace it.</div>
                         </div>
                     {% endif %}
                     <input type="file" class="form-control" id="image" name="image"
                            accept="image/jpeg,image/png,image/gif,image/webp">
                     <div class="form-text">JPG, PNG, GIF or WebP, up to 5 MB.</div>
-                    <img id="image-preview" class="rounded mt-2 d-none" alt="Preview" style="height: 120px; object-fit: cover;">
+                    <img id="image-preview" class="mt-2 d-none" alt="Preview" style="height: 140px; border-radius: 18px; object-fit: cover;">
                 </div>
             </fieldset>
-            <div class="form-group">
-                <button type="submit" class="btn btn-primary">{{ "Update" if property else "Add" }} Property</button>
-                <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">Cancel</a>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-dark btn-lg">{{ "Update" if property else "Add" }} Property</button>
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-light btn-lg">Cancel</a>
             </div>
         </form>
     </div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script id="pin-data" type="application/json">{{ town_coords|tojson }}</script>
+    <script src="{{ url_for('static', filename='pin_picker.js') }}"></script>
     <script>
         // Show a preview of the chosen photo before uploading
         document.getElementById('image').addEventListener('change', function() {

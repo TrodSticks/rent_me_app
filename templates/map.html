@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% from "_macros.html" import view_switch, default_photo with context %}
+{% block head %}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+{% endblock %}
+{% block content %}
+    {% set view = 'main.map_view' %}
+    <h1 class="visually-hidden">Map of properties</h1>
+    {% include "_search_controls.html" %}
+
+    <div class="rm-result-note">
+        <span>
+            <strong>{{ total }}</strong> {{ 'property' if total == 1 else 'properties' }} on the map{% if search_query %} for <strong>"{{ search_query }}"</strong>{% endif %}
+        </span>
+        {{ view_switch('map') }}
+    </div>
+
+    <div class="rm-map-layout">
+        <!-- What's in the part of the map on screen (filled in by map.js) -->
+        <aside class="rm-map-list" id="map-list" aria-label="Properties in view" aria-live="polite"></aside>
+
+        <div class="rm-map-stage">
+            <div id="map" class="rm-map" role="application" aria-label="Map of Botswana showing properties"></div>
+
+            <button type="button" class="rm-map-btn" id="town-button" aria-haspopup="dialog">
+                <i class="fas fa-map-marker-alt"></i><span id="town-button-label">Choose a town</span>
+            </button>
+
+            <div class="rm-map-status" id="map-status" role="status" hidden></div>
+
+            <!-- Town chooser: shown on a first visit, and from the button above -->
+            <div class="rm-town-chooser" id="town-chooser" role="dialog" aria-modal="true" aria-labelledby="town-chooser-title" hidden>
+                <div class="rm-town-chooser-panel">
+                    <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                        <h2 class="h5 mb-0" id="town-chooser-title">Where are you looking?</h2>
+                        <button type="button" class="rm-map-card-close position-static" id="town-chooser-close" aria-label="Close">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <p class="text-muted small mb-3">Pick a town to open the map there. We'll remember it for next time.</p>
+                    {% if towns %}
+                        <div class="rm-town-grid">
+                            {% for town in towns|sort(attribute='count', reverse=true) %}
+                                <button type="button" class="rm-town-option" data-town="{{ town.name }}">
+                                    <strong>{{ town.name }}</strong>
+                                    <span>{{ town.count }} {{ 'property' if town.count == 1 else 'properties' }}</span>
+                                </button>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="mb-3">No properties match. Try removing a filter.</p>
+                    {% endif %}
+                    <button type="button" class="btn btn-light w-100 mt-3" id="town-all">
+                        <i class="fas fa-globe-africa me-2"></i>Show all of Botswana
+                    </button>
+                </div>
+            </div>
+
+            <!-- The property picked on the map -->
+            <div class="rm-map-card" id="map-card" hidden>
+                <img id="map-card-photo" class="rm-row-thumb" alt="" data-fallback="{{ default_photo() }}">
+                <div class="rm-row-main">
+                    <span class="rm-tag" id="map-card-type"></span>
+                    <span class="rm-tag" id="map-card-approx" hidden>Approximate location</span>
+                    <h2 class="h6 mt-1 mb-1" id="map-card-title"></h2>
+                    <div class="property-details">
+                        <span class="property-detail-item"><i class="fas fa-map-marker-alt"></i><span id="map-card-town"></span></span>
+                        <span class="property-detail-item"><i class="fas fa-bed"></i><span id="map-card-beds"></span></span>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between gap-2 mt-2">
+                        <span class="property-price" id="map-card-price"></span>
+                        <a class="btn btn-dark btn-sm" id="map-card-link" href="#">View details</a>
+                    </div>
+                </div>
+                <button type="button" class="rm-map-card-close" id="map-card-close" aria-label="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="rm-map-fallback" id="map-fallback" hidden>
+                <i class="far fa-map fa-2x mb-2"></i>
+                <p class="mb-2">The map couldn't load. Check your internet connection and reload the page.</p>
+                <a href="{{ filter_url('main.home') }}" class="btn btn-dark btn-sm">Browse the list instead</a>
+            </div>
+        </div>
+    </div>
+
+    <p class="text-muted small mt-3 mb-0">
+        <i class="fas fa-info-circle me-1"></i>Pins with a dashed edge are approximate: they show the town, not the exact address.
+    </p>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script id="map-data" type="application/json">{{ {
+        'towns': towns,
+        'townCentres': town_centres,
+        'focus': focus,
+        'filterTown': filters.location if filters.location in locations else none,
+        'pinsUrl': url_for('main.map_pins_api'),
+        'defaultPhoto': default_photo()
+    }|tojson }}</script>
+    <script src="{{ url_for('static', filename='map.js') }}"></script>
+{% endblock %}

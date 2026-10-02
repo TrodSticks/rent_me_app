@@ -13,6 +13,25 @@ LOCATIONS = [
     'Palapye', 'Jwaneng', 'Ghanzi', 'Tsabong', 'Letlhakane'
 ]
 
+# Approximate town-centre coordinates (latitude, longitude) for the map view
+TOWN_COORDS = {
+    'Gaborone': (-24.6282, 25.9231),
+    'Phakalane': (-24.5700, 25.9800),
+    'Francistown': (-21.1700, 27.5079),
+    'Maun': (-19.9833, 23.4167),
+    'Kasane': (-17.7980, 25.1530),
+    'Serowe': (-22.3875, 26.7108),
+    'Molepolole': (-24.4066, 25.4951),
+    'Kanye': (-24.9667, 25.3327),
+    'Mochudi': (-24.4167, 26.1500),
+    'Lobatse': (-25.2167, 25.6667),
+    'Palapye': (-22.5460, 27.1251),
+    'Jwaneng': (-24.6017, 24.7281),
+    'Ghanzi': (-21.6978, 21.6458),
+    'Tsabong': (-26.0500, 22.4500),
+    'Letlhakane': (-21.4149, 25.5926),
+}
+
 class PropertySearchEngine:
     """AI-powered property search engine using natural language processing"""
 

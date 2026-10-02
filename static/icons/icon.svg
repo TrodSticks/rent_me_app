@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Rent Me">
+  <rect width="512" height="512" rx="116" fill="#0D6EFD"/>
+  <rect x="322" y="130" width="34" height="70" rx="5" fill="#FFFFFF"/>
+  <polyline points="124,240 256,126 388,240" fill="none" stroke="#FFFFFF" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M256 428 C226 392 176 344 176 292 A80 80 0 1 1 336 292 C336 344 286 392 256 428 Z" fill="#FFFFFF"/>
+  <circle cx="256" cy="290" r="42" fill="#0D6EFD"/>
+  <rect x="237" y="271" width="16" height="16" rx="4" fill="#FFFFFF"/>
+  <rect x="259" y="271" width="16" height="16" rx="4" fill="#FFFFFF"/>
+  <rect x="237" y="293" width="16" height="16" rx="4" fill="#FFFFFF"/>
+  <rect x="259" y="293" width="16" height="16" rx="4" fill="#FFFFFF"/>
+</svg>

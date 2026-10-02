@@ -1,90 +1,47 @@
 {% extends "base.html" %}
 {% block content %}
-    <div class="row justify-content-center">
-        <div class="col-lg-5 col-md-7">
-            <div class="card shadow">
-                <div class="card-header bg-primary text-white text-center">
-                    <h4 class="mb-0">
-                        <i class="fas fa-sign-in-alt me-2"></i>
-                        Welcome Back
-                    </h4>
-                    <p class="mb-0 mt-2 text-light">Sign in to your Rent Me account</p>
-                </div>
-                <div class="card-body p-4">
-                    <form method="POST" action=""><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <div class="mb-3">
-                            <label for="email" class="form-label">
-                                <i class="fas fa-envelope me-1"></i>Email Address
-                            </label>
-                            <input type="email" 
-                                   class="form-control form-control-lg" 
-                                   id="email" 
-                                   name="email" 
-                                   placeholder="your.email@example.com"
-                                   required>
-                        </div>
+    <div class="rm-auth">
+        <div class="rm-auth-head">
+            <img src="{{ url_for('static', filename='icons/icon.svg') }}" alt="">
+            <h1>Welcome back</h1>
+            <p>Sign in to your Rent Me account</p>
+        </div>
 
-                        <div class="mb-4">
-                            <label for="password" class="form-label">
-                                <i class="fas fa-lock me-1"></i>Password
-                            </label>
-                            <input type="password" 
-                                   class="form-control form-control-lg" 
-                                   id="password" 
-                                   name="password" 
-                                   placeholder="Enter your password"
-                                   required>
-                        </div>
-
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="fas fa-sign-in-alt me-2"></i>Sign In
-                            </button>
-                        </div>
-                    </form>
-                </div>
-                <div class="card-footer text-center bg-light">
-                    <small class="text-muted">
-                        Don't have an account? 
-                        <a href="{{ url_for('main.register') }}" class="text-decoration-none">
-                            <i class="fas fa-user-plus me-1"></i>Create one here
-                        </a>
-                    </small>
-                </div>
-            </div>
-
-            <!-- Demo Accounts Info -->
-            <div class="card mt-4 bg-light">
-                <div class="card-body text-center">
-                    <h6 class="card-title">
-                        <i class="fas fa-info-circle me-2"></i>Demo Accounts
-                    </h6>
-                    <p class="card-text small text-muted mb-3">
-                        For testing purposes, you can create new accounts or use these demo credentials:
-                    </p>
-                    <div class="row">
-                        <div class="col-6">
-                            <div class="border rounded p-2 mb-2">
-                                <strong>Landlord Demo</strong><br>
-                                <small class="text-muted">
-                                    Email: landlord@demo.com<br>
-                                    Password: demo123
-                                </small>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="border rounded p-2 mb-2">
-                                <strong>Renter Demo</strong><br>
-                                <small class="text-muted">
-                                    Email: renter@demo.com<br>
-                                    Password: demo123
-                                </small>
-                            </div>
-                        </div>
+        <div class="card">
+            <div class="card-body p-4">
+                <form method="POST" action=""><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email address</label>
+                        <input type="email" class="form-control form-control-lg" id="email" name="email"
+                               placeholder="your.email@example.com" autocomplete="email" required>
                     </div>
+                    <div class="mb-4">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control form-control-lg" id="password" name="password"
+                               placeholder="Enter your password" autocomplete="current-password" required>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-dark btn-lg">Sign in</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <p class="text-center text-muted mt-3">
+            Don't have an account?
+            <a href="{{ url_for('main.register') }}" class="fw-semibold text-decoration-none">Create one</a>
+        </p>
+
+        <!-- Demo accounts -->
+        <div class="card bg-light mt-4">
+            <div class="card-body">
+                <h2 class="h6 mb-2"><i class="fas fa-info-circle me-2"></i>Demo accounts</h2>
+                <p class="small text-muted mb-2">For testing. The password for both is <strong>demo123</strong>.</p>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="rm-tag">Landlord: landlord@demo.com</span>
+                    <span class="rm-tag">Renter: renter@demo.com</span>
                 </div>
             </div>
         </div>
     </div>
 {% endblock %}
-

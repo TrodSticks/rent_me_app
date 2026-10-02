@@ -42,6 +42,9 @@ class Property(db.Model):
     bedrooms = db.Column(db.Integer, nullable=False)
     property_type = db.Column(db.String(20), nullable=False, default='house')
     image_file = db.Column(db.String(20), nullable=False, default='default.jpg')
+    # Exact spot marked by the landlord. Empty means "somewhere in this town".
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
     landlord_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     favorites = db.relationship('Favorite', backref='property', lazy=True)
 
