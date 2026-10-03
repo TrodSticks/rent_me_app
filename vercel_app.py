@@ -3,7 +3,7 @@
 Vercel's file system is read-only apart from /tmp, so the database and uploaded
 photos live there. /tmp is wiped whenever Vercel starts a fresh copy of the
 app, so the demo data is put back each time and anything added is temporary.
-SECRET_KEY must be set in the Vercel project settings.
+Set SECRET_KEY in the Vercel project settings so logins survive restarts.
 """
 import os
 

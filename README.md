@@ -81,7 +81,7 @@ A full-stack web application for property rentals in Botswana, featuring AI-powe
 
 ### Hosted demo (Vercel)
 
-`vercel_app.py` is the entry point on Vercel (set in `pyproject.toml`). It keeps the database and uploads in `/tmp` and loads the demo data on start-up, so changes made on the demo are temporary. Set `SECRET_KEY` in the Vercel project's environment variables.
+`vercel_app.py` is the entry point on Vercel (set in `pyproject.toml`). It keeps the database and uploads in `/tmp` and loads the demo data on start-up, so changes made on the demo are temporary. Set `SECRET_KEY` in the Vercel project's environment variables so logins survive restarts.
 
 ### Database changes (migrations)
 

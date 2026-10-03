@@ -16,8 +16,11 @@ def _load_secret_key():
         if key:
             return key
     key = secrets.token_hex(32)
-    with open(path, 'w') as f:
-        f.write(key)
+    try:
+        with open(path, 'w') as f:
+            f.write(key)
+    except OSError:
+        pass  # read-only file system (e.g. Vercel without SECRET_KEY): key lasts until restart
     return key
 
 
