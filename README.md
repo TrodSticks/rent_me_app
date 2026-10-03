@@ -58,6 +58,7 @@ A full-stack web application for property rentals in Botswana, featuring AI-powe
    ```bash
    pip install -r requirements.txt
    ```
+   For spaCy-based search and the optional AI model, also run `pip install -r requirements-ai.txt`. Without them, search uses the rule-based parser.
 
 3. **AI search model (optional, currently off by default)**
    ```bash
@@ -77,6 +78,10 @@ A full-stack web application for property rentals in Botswana, featuring AI-powe
 
 6. **Access the application**
    Open your browser and go to `http://localhost:5000`
+
+### Hosted demo (Vercel)
+
+`vercel_app.py` is the entry point on Vercel (set in `pyproject.toml`). It keeps the database and uploads in `/tmp` and loads the demo data on start-up, so changes made on the demo are temporary. Set `SECRET_KEY` in the Vercel project's environment variables.
 
 ### Database changes (migrations)
 
