@@ -39,8 +39,11 @@ def _load_secret_key():
         if key:
             return key
     key = secrets.token_hex(32)
-    with open(path, 'w') as f:
-        f.write(key)
+    try:
+        with open(path, 'w') as f:
+            f.write(key)
+    except OSError:
+        pass  # read-only file system (e.g. Vercel without SECRET_KEY): key lasts until restart
     return key
 
 
@@ -75,7 +78,7 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///' + os.path.join(BASE_DIR, 'app.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'property_pics')
+    UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER') or os.path.join(BASE_DIR, 'static', 'property_pics')
     MAX_IMAGE_BYTES = MAX_IMAGE_BYTES
     MAX_PHOTOS = MAX_PHOTOS
     # A full set of photos in one request, plus room for the rest of the form
