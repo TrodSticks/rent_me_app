@@ -1,6 +1,7 @@
 // Map view.
 // Zoomed out: one bubble per town. Zoomed in: price pins for the part of the map on screen,
 // fetched from the server as the map moves, with overlapping pins grouped into numbered circles.
+// "Near me" asks the browser where the visitor is, opens the map there and lists pins nearest first.
 
 (function() {
     const mapEl = document.getElementById('map');
@@ -17,6 +18,7 @@
     const PIN_ZOOM = 11;        // from this zoom level, show individual properties
     const TOWN_ZOOM = 13;       // zoom used when opening a town
     const FOCUS_ZOOM = 16;      // zoom used when opening one property
+    const NEAR_ZOOM = 14;       // zoom used when opening on the visitor's location
     const MAX_LIST_ROWS = 60;
     const STORAGE_KEY = 'rentme.mapTown';
 
@@ -27,9 +29,15 @@
     const townButtonLabel = document.getElementById('town-button-label');
     const card = document.getElementById('map-card');
     const cardPhoto = document.getElementById('map-card-photo');
+    const nearButton = document.getElementById('near-me-button');
+    const chooserNearButton = document.getElementById('town-near-me');
+    const cardDistance = document.getElementById('map-card-distance');
 
     const formatPrice = price => 'P' + Number(price).toLocaleString('en-US');
     const townCentre = name => data.townCentres.find(t => t.name === name);
+    const formatDistance = metres => metres < 1000
+        ? `${Math.max(50, Math.round(metres / 50) * 50)} m`
+        : `${(metres / 1000).toFixed(metres < 10000 ? 1 : 0)} km`;
 
     // The visitor's last town. Storage can be unavailable (private windows), so never rely on it.
     function rememberedTown() {
@@ -41,8 +49,9 @@
 
     // ---------- Map and layers ----------
 
+    const MAP_AREA = L.latLngBounds([[-30.5, 15.5], [-14.5, 33.5]]);
     const map = L.map(mapEl, { zoomControl: false, minZoom: 5, maxBoundsViscosity: 0.6 });
-    map.setMaxBounds([[-30.5, 15.5], [-14.5, 33.5]]);
+    map.setMaxBounds(MAP_AREA);
     L.control.zoom({ position: 'topright' }).addTo(map);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
@@ -94,6 +103,9 @@
     let loadedBounds = null;    // area the loaded pins cover
     let loadedComplete = false; // false when the server held some back
     let request = null;
+    let here = null;            // the visitor's position, once they've used "Near me"
+    const hereLayer = L.layerGroup().addTo(map);
+    const distanceTo = pin => here.distanceTo([pin.lat, pin.lng]);
 
     // ---------- Town chooser ----------
 
@@ -131,6 +143,63 @@
         townButtonLabel.textContent = 'Choose a town';
         map.flyToBounds(BOTSWANA, { duration: 0.8 });
     });
+
+    // ---------- Near me ----------
+    // Browsers only share location with https pages, and the visitor has to allow it.
+    // The position is used on this page only; it is never sent to the server or saved.
+
+    function setLocating(busy) {
+        [nearButton, chooserNearButton].forEach(button => {
+            button.disabled = busy;
+            button.setAttribute('aria-busy', String(busy));
+        });
+    }
+
+    function showHere(position) {
+        const { latitude, longitude, accuracy } = position.coords;
+        here = L.latLng(latitude, longitude);
+        hereLayer.clearLayers();
+        if (accuracy < 2000) {
+            L.circle(here, { radius: accuracy, color: '#0D6EFD', weight: 1, fillOpacity: 0.08, interactive: false })
+                .addTo(hereLayer);
+        }
+        L.marker(here, {
+            icon: L.divIcon({ className: 'rm-pin-anchor', html: el('span', 'rm-me-dot'), iconSize: [0, 0] }),
+            title: 'You are here',
+            keyboard: false,
+            zIndexOffset: -1000
+        }).addTo(hereLayer);
+    }
+
+    function locate() {
+        chooser.hidden = true;
+        setLocating(true);
+        showStatus('Finding where you are…');
+        navigator.geolocation.getCurrentPosition(position => {
+            setLocating(false);
+            const spot = L.latLng(position.coords.latitude, position.coords.longitude);
+            if (!MAP_AREA.contains(spot)) {
+                showStatus("You seem to be outside Botswana, so we can't show listings near you. Choose a town instead.");
+                return;
+            }
+            showHere(position);
+            townButtonLabel.textContent = 'Choose a town';
+            showStatus('');
+            map.flyTo(here, NEAR_ZOOM, { duration: 0.8 });
+        }, error => {
+            setLocating(false);
+            showStatus(error.code === error.PERMISSION_DENIED
+                ? 'Location is blocked for this site. Allow it in your browser settings, or choose a town.'
+                : "Couldn't find your location. Try again, or choose a town.");
+        }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+    }
+
+    if (window.isSecureContext && 'geolocation' in navigator) {
+        nearButton.hidden = false;
+        chooserNearButton.hidden = false;
+        nearButton.addEventListener('click', locate);
+        chooserNearButton.addEventListener('click', locate);
+    }
 
     // ---------- Loading pins for the visible area ----------
 
@@ -244,6 +313,7 @@
     function renderPinList() {
         const view = map.getBounds();
         const visible = pins.filter(pin => view.contains([pin.lat, pin.lng]));
+        if (here) visible.sort((a, b) => distanceTo(a) - distanceTo(b));
         if (!visible.length) {
             listMessage('No properties in this part of the map. Move the map, zoom out, or choose another town.');
             return;
@@ -265,6 +335,11 @@
             const beds = el('span', 'property-detail-item');
             beds.append(el('i', 'fas fa-bed'), String(pin.bedrooms));
             details.append(town, beds);
+            if (here) {
+                const distance = el('span', 'property-detail-item rm-row-distance');
+                distance.append(el('i', 'fas fa-location-arrow'), formatDistance(distanceTo(pin)));
+                details.append(distance);
+            }
 
             const price = el('span', 'property-price', formatPrice(pin.price) + ' ');
             price.append(el('small', '', '/ month'));
@@ -276,7 +351,7 @@
             return row;
         });
         const heading = el('p', 'text-muted small px-1 mb-0',
-            `${visible.length} ${visible.length === 1 ? 'property' : 'properties'} in view`);
+            `${visible.length} ${visible.length === 1 ? 'property' : 'properties'} in view${here ? ', nearest first' : ''}`);
         listEl.replaceChildren(heading, ...rows);
         if (visible.length > MAX_LIST_ROWS) {
             listEl.append(el('p', 'text-muted small px-1 mb-0',
@@ -304,6 +379,8 @@
         document.getElementById('map-card-title').textContent = pin.title;
         document.getElementById('map-card-town').textContent = pin.town;
         document.getElementById('map-card-beds').textContent = pin.bedrooms + (pin.bedrooms === 1 ? ' bed' : ' beds');
+        cardDistance.hidden = !here;
+        if (here) cardDistance.lastElementChild.textContent = formatDistance(distanceTo(pin)) + ' away';
         const price = document.getElementById('map-card-price');
         price.replaceChildren(formatPrice(pin.price) + ' ', el('small', '', '/ month'));
         document.getElementById('map-card-link').href = pin.url;

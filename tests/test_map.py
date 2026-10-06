@@ -207,3 +207,10 @@ def test_focus_is_dropped_when_changing_filters(app, client):
     html = client.get('/map?focus=1&location=Gaborone').get_data(as_text=True)
     chip = re.search(r'class="rm-chip\s*" href="(/map\?[^"]*property_type=house[^"]*)"', html).group(1)
     assert 'focus' not in chip and 'location=Gaborone' in chip
+
+
+def test_near_me_buttons_start_hidden(client):
+    # map.js shows them only when the browser can share its location (https and geolocation)
+    html = client.get('/map').get_data(as_text=True)
+    assert re.search(r'<button[^>]*id="near-me-button"[^>]*hidden', html)
+    assert re.search(r'<button[^>]*id="town-near-me"[^>]*hidden', html)

@@ -23,9 +23,15 @@
         <div class="rm-map-stage">
             <div id="map" class="rm-map" role="application" aria-label="Map of Botswana showing properties"></div>
 
-            <button type="button" class="rm-map-btn" id="town-button" aria-haspopup="dialog">
-                <i class="fas fa-map-marker-alt"></i><span id="town-button-label">Choose a town</span>
-            </button>
+            <div class="rm-map-controls">
+                <button type="button" class="rm-map-btn" id="town-button" aria-haspopup="dialog">
+                    <i class="fas fa-map-marker-alt"></i><span id="town-button-label">Choose a town</span>
+                </button>
+                <!-- Shown by map.js only when the browser can share its location (needs https) -->
+                <button type="button" class="rm-map-btn" id="near-me-button" hidden>
+                    <i class="fas fa-location-arrow"></i><span>Near me</span>
+                </button>
+            </div>
 
             <div class="rm-map-status" id="map-status" role="status" hidden></div>
 
@@ -51,7 +57,10 @@
                     {% else %}
                         <p class="mb-3">No properties match. Try removing a filter.</p>
                     {% endif %}
-                    <button type="button" class="btn btn-light w-100 mt-3" id="town-all">
+                    <button type="button" class="btn btn-dark w-100 mt-3" id="town-near-me" hidden>
+                        <i class="fas fa-location-arrow me-2"></i>Use my location
+                    </button>
+                    <button type="button" class="btn btn-light w-100 mt-2" id="town-all">
                         <i class="fas fa-globe-africa me-2"></i>Show all of Botswana
                     </button>
                 </div>
@@ -67,6 +76,7 @@
                     <div class="property-details">
                         <span class="property-detail-item"><i class="fas fa-map-marker-alt"></i><span id="map-card-town"></span></span>
                         <span class="property-detail-item"><i class="fas fa-bed"></i><span id="map-card-beds"></span></span>
+                        <span class="property-detail-item rm-row-distance" id="map-card-distance" hidden><i class="fas fa-location-arrow"></i><span></span></span>
                     </div>
                     <div class="d-flex align-items-center justify-content-between gap-2 mt-2">
                         <span class="property-price" id="map-card-price"></span>

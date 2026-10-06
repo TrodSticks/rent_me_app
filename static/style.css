@@ -691,16 +691,23 @@ main.rm-main {
 
 .rm-price-pin.approx { border-style: dashed; }
 
-/* Button on the map that opens the town chooser */
-.rm-map-btn {
+/* Buttons on the map: the town chooser and "Near me" */
+.rm-map-controls {
     position: absolute;
     top: 12px;
     left: 12px;
     z-index: 2;
+    display: flex;
+    gap: 0.5rem;
+    max-width: calc(100% - 80px);
+}
+
+.rm-map-btn {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    max-width: calc(100% - 80px);
+    min-width: 0;
+    white-space: nowrap;
     padding: 0.5rem 0.9rem;
     border: none;
     border-radius: 14px;
@@ -714,6 +721,23 @@ main.rm-main {
 
 .rm-map-btn i { color: var(--rm-blue); }
 .rm-map-btn:hover { background: var(--rm-surface); }
+#town-button-label { overflow: hidden; text-overflow: ellipsis; }
+.rm-map-btn[aria-busy="true"] i { animation: rm-pulse 1s ease-in-out infinite; }
+@keyframes rm-pulse { 50% { opacity: 0.3; } }
+
+/* The visitor's own position, from "Near me" */
+.rm-me-dot {
+    display: block;
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+    border: 3px solid var(--rm-white);
+    border-radius: 50%;
+    background: var(--rm-blue);
+    box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.25), 0 2px 6px rgba(15, 23, 42, 0.35);
+}
+
+.rm-row-distance { color: var(--rm-blue); font-weight: 600; }
 
 .rm-map-status {
     position: absolute;
@@ -1190,6 +1214,7 @@ footer.rm-footer .rm-brand img { width: 28px; height: 28px; border-radius: 8px; 
 
 @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; scroll-behavior: auto !important; }
+    .rm-map-btn[aria-busy="true"] i { animation: none; }
     .property-card:hover, .property-card:hover .rm-photo img { transform: none; }
 }
 
