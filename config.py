@@ -39,8 +39,11 @@ def _load_secret_key():
         if key:
             return key
     key = secrets.token_hex(32)
-    with open(path, 'w') as f:
-        f.write(key)
+    try:
+        with open(path, 'w') as f:
+            f.write(key)
+    except OSError:
+        pass  # read-only file system (e.g. Vercel without SECRET_KEY): key lasts until restart
     return key
 
 
@@ -110,7 +113,7 @@ class Config:
     SQLALCHEMY_ENGINE_OPTIONS = _engine_options(DATABASE_URL)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'property_pics')
+    UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER') or os.path.join(BASE_DIR, 'static', 'property_pics')
     # Supabase Storage for photos. Without these, photos are saved in UPLOAD_FOLDER.
     # The service role key is a server-side secret: set it only in the server's environment.
     SUPABASE_URL = os.environ.get('SUPABASE_URL', '').strip().rstrip('/')

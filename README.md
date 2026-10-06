@@ -43,6 +43,7 @@ The rule-based search parser always runs. An optional local model (LiquidAI LFM2
    ```bash
    pip install -r requirements.txt
    ```
+   For spaCy-based search and the optional AI model, also run `pip install -r requirements-ai.txt`. Without them, search uses the rule-based parser.
 
 2. **Create your local settings file**
 
@@ -111,6 +112,10 @@ Any provider that offers SMTP works. Use `MAIL_USE_SSL=1` and `MAIL_PORT=465` if
 **Not yet tested against a real mail server.** The SMTP code is exercised by automated tests using a stand-in server, and the development mailbox was tested by hand. After configuring a provider, sign up with a real address and check that the email arrives before relying on it.
 
 Email bodies contain sign-in links, so the app never writes them to its log.
+
+## Hosted demo (Vercel)
+
+`vercel_app.py` is the entry point on Vercel (set in `pyproject.toml`). It keeps the database and uploads in `/tmp` and loads the demo data on start-up, so changes made on the demo are temporary, unless you connect Supabase as described below: then data and photos are kept, and the demo data is only loaded into an empty database. Set `SECRET_KEY` in the Vercel project's environment variables so logins survive restarts.
 
 ## Keeping data on a hosted site (Supabase)
 
