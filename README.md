@@ -10,6 +10,7 @@ Built with Flask, SQLAlchemy and Flask-Migrate.
 - Browse available properties as a list (12 per page) or on a map
 - Plain-English search ("cheap 2 bedroom house in Gaborone with parking"), plus filters for type, town, bedrooms, bathrooms, price range and amenities
 - Map view that opens on your last town, shows a price pin per property, groups pins that overlap and loads only the part of the map on screen
+- "Near me" on the map: with your permission, opens the map where you are and lists the properties in view nearest first, with their distance. Your location stays in your browser; it is never sent to the server
 - Property pages with a swipeable photo gallery and full-screen viewer, monthly rent, security deposit, availability, bathrooms and amenities
 - Save favourites, message landlords, and report a listing
 
