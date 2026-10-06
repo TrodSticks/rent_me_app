@@ -68,14 +68,54 @@ def _mail_backend():
     return backend
 
 
+def _database_url():
+    """DATABASE_URL, pointed at the psycopg driver when it is a Postgres address (as Supabase gives).
+
+    Defaults to the local app.db SQLite file.
+    """
+    url = os.environ.get('DATABASE_URL', '').strip()
+    if not url:
+        return 'sqlite:///' + os.path.join(BASE_DIR, 'app.db')
+    for prefix in ('postgres://', 'postgresql://'):
+        if url.startswith(prefix):
+            return 'postgresql+psycopg://' + url[len(prefix):]
+    return url
+
+
+def _engine_options(url):
+    """Connection settings that suit a hosted Postgres database."""
+    if not url.startswith('postgresql'):
+        return {}
+    options = {
+        # Drop connections the database or its pooler has closed, rather than failing a request
+        'pool_pre_ping': True,
+        # Supabase's transaction pooler (port 6543) can't keep prepared statements between queries
+        'connect_args': {'prepare_threshold': None},
+    }
+    if os.environ.get('VERCEL'):
+        # Each serverless copy of the app lives briefly; leave connection pooling to Supabase
+        from sqlalchemy.pool import NullPool
+        options['poolclass'] = NullPool
+    return options
+
+
+DATABASE_URL = _database_url()
+
+
 class Config:
     APP_ENV = APP_ENV
     IS_DEVELOPMENT = IS_DEVELOPMENT
     SECRET_KEY = _load_secret_key()
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///' + os.path.join(BASE_DIR, 'app.db')
+    SQLALCHEMY_DATABASE_URI = DATABASE_URL
+    SQLALCHEMY_ENGINE_OPTIONS = _engine_options(DATABASE_URL)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'property_pics')
+    # Supabase Storage for photos. Without these, photos are saved in UPLOAD_FOLDER.
+    # The service role key is a server-side secret: set it only in the server's environment.
+    SUPABASE_URL = os.environ.get('SUPABASE_URL', '').strip().rstrip('/')
+    SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
+    SUPABASE_STORAGE_BUCKET = os.environ.get('SUPABASE_STORAGE_BUCKET', 'property-photos').strip()
     MAX_IMAGE_BYTES = MAX_IMAGE_BYTES
     MAX_PHOTOS = MAX_PHOTOS
     # A full set of photos in one request, plus room for the rest of the form

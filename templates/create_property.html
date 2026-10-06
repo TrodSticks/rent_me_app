@@ -115,7 +115,7 @@
                         <ul class="rm-photo-grid" id="photo-grid" aria-label="Photos on this listing">
                             {% for photo in photos %}
                                 <li class="rm-photo-tile" data-photo-id="{{ photo.id }}">
-                                    <img src="{{ url_for('static', filename='property_pics/' + photo.filename) }}" alt="Photo {{ loop.index }}">
+                                    <img src="{{ stored_photo_url(photo.filename) }}" alt="Photo {{ loop.index }}">
                                     <input type="hidden" name="photo_order" value="{{ photo.id }}">
                                     <span class="rm-cover-flag">Cover</span>
                                     <div class="rm-photo-actions">

@@ -12,3 +12,4 @@ transformers
 torch
 Flask-WTF
 Pillow
+psycopg[binary]
