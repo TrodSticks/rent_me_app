@@ -1,7 +1,7 @@
 {# Shared building blocks. Import with: {% from "_macros.html" import property_card with context %} #}
 
 {% macro photo_url(property) -%}
-    {{ url_for('static', filename='property_pics/' + property.image_file) }}
+    {{ stored_photo_url(property.image_file) }}
 {%- endmacro %}
 
 {% macro default_photo() -%}

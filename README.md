@@ -116,7 +116,39 @@ Email bodies contain sign-in links, so the app never writes them to its log.
 
 ## Hosted demo (Vercel)
 
-`vercel_app.py` is the entry point on Vercel (set in `pyproject.toml`). It keeps the database and uploads in `/tmp` and loads the demo data on start-up, so changes made on the demo are temporary. Set `SECRET_KEY` in the Vercel project's environment variables so logins survive restarts.
+`vercel_app.py` is the entry point on Vercel (set in `pyproject.toml`). It keeps the database and uploads in `/tmp` and loads the demo data on start-up, so changes made on the demo are temporary, unless you connect Supabase as described below: then data and photos are kept, and the demo data is only loaded into an empty database. Set `SECRET_KEY` in the Vercel project's environment variables so logins survive restarts.
+
+## Keeping data on a hosted site (Supabase)
+
+On a host without a lasting disk, such as Vercel, the SQLite file and uploaded photos disappear whenever the host starts a fresh copy of the app. Point the app at Supabase to keep them: a Postgres database for accounts, listings and messages, and a Storage bucket for photos. Nothing changes on your own computer unless you set these variables.
+
+### 1. In Supabase
+
+1. Create a project at [supabase.com](https://supabase.com) and keep the database password it asks for somewhere safe.
+2. **Database address.** Click **Connect**, choose **Transaction pooler**, and copy the connection string (it uses port 6543). Replace `[YOUR-PASSWORD]` with the database password. The pooler is the right choice for Vercel: the direct connection needs IPv6, which Vercel doesn't offer.
+3. **Photo bucket.** Open **Storage**, create a bucket named `property-photos` and switch on **Public bucket**, so browsers can show the photos.
+4. **Keys.** Open **Project Settings → API Keys** and note the **Project URL** and a server key: either the legacy **service_role** key or a new **secret** key (starts with `sb_secret_`). Either works.
+
+### 2. In Vercel
+
+In the Vercel project, open **Settings → Environment Variables** and add, for Production (and Preview if you want previews to share the data):
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | The transaction pooler connection string from step 2 |
+| `SUPABASE_URL` | The Project URL, e.g. `https://abcd1234.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | The service_role key |
+| `SUPABASE_STORAGE_BUCKET` | Only if you named the bucket something other than `property-photos` |
+| `SECRET_KEY` | A long random value, if it isn't set already |
+
+Then redeploy. On its first start the app creates its tables in Supabase (one copy at a time, even when Vercel starts several) and from then on keeps them up to date.
+
+### Good to know
+
+- **The service_role key bypasses all of Supabase's access rules.** Keep it in the server's environment only: never in the repository, in front-end JavaScript, or in the phone app. The phone app uses the separate public (anon) key.
+- **The tables are closed to Supabase's Data API.** Supabase lets anyone with the public anon key read tables through its Data API unless row level security is on. The app switches it on for all of its tables (migration `0004_lock_down_data_api`) with no policies, so the public key can't read them, while the app itself, which connects as the database owner, works as before.
+- **`create_sample_data.py` deletes everything.** With `DATABASE_URL` pointing at Supabase it wipes the live data, so only run it against a database you mean to reset.
+- **Photos already on a server's disk are not copied** to the bucket. Listings keep their filenames, so re-upload those photos (or copy the files into the bucket under the same names).
 
 ## Database changes (migrations)
 
@@ -151,7 +183,9 @@ These can go in `.env` or in the real environment. Real environment variables wi
 |---|---|---|
 | `APP_ENV` | `development` or `production`. Development turns on the local mailbox and allows login cookies over http. | `production` |
 | `SECRET_KEY` | Signs login cookies and emailed links. **Set this on any real server.** | A random key saved to a git-ignored `.secret_key` file |
-| `DATABASE_URL` | Database connection string | Local `app.db` SQLite file |
+| `DATABASE_URL` | Database connection string. `postgres://` and `postgresql://` addresses (as Supabase gives them) are used with the psycopg driver. | Local `app.db` SQLite file |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Store photos in Supabase Storage instead of `static/property_pics/` (see "Keeping data on a hosted site") | Not set: photos stay on disk |
+| `SUPABASE_STORAGE_BUCKET` | The public Storage bucket for photos | `property-photos` |
 | `AUTO_MIGRATE` | Set to `0` to stop the app updating the database when it starts | On |
 | `MAIL_SERVER`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` | SMTP server details | None; port 587 |
 | `MAIL_USE_TLS` / `MAIL_USE_SSL` | STARTTLS (port 587) or SSL (port 465) | TLS on, SSL off |
@@ -172,7 +206,7 @@ These can go in `.env` or in the real environment. Real environment variables wi
 4. If the app sits behind a reverse proxy, set `TRUSTED_PROXY_COUNT`, or every visitor will appear to come from the proxy and share one rate limit.
 5. Create the first administrator with `flask --app app make-admin`.
 6. Sign up with a real email address and confirm the verification email arrives.
-7. Uploaded photos are stored in `static/property_pics/` and the default database is a single SQLite file. Make sure your host keeps both between restarts, or use a hosted database through `DATABASE_URL`.
+7. Uploaded photos are stored in `static/property_pics/` and the default database is a single SQLite file. Make sure your host keeps both between restarts, or use Supabase (see "Keeping data on a hosted site").
 8. The map uses free OpenStreetMap tiles, which are fine for testing but not for heavy traffic. Choose a tile provider before launch.
 
 ## How the main pieces work
@@ -181,7 +215,7 @@ These can go in `.env` or in the real environment. Real environment variables wi
 - **Pagination.** The list page runs one count query and one query for the 12 listings on the page, sorted with the listing id as a tie-breaker so pages never overlap.
 - **Map.** Each listing has a stored map position: the landlord's exact pin, or a stable approximate spot near the town centre. `/api/map-pins` asks the database for the listings inside the visible area, capped at 300, with a separate count.
 - **Visibility.** A listing is public when it is published, not hidden and available. Reserved and rented listings can still be opened directly and are labelled. Drafts and hidden listings can only be opened by their owner or an administrator.
-- **Photos.** Uploads are checked, turned upright, shrunk to at most 1200 pixels and saved as JPEG. The cover photo's filename is also kept on the listing so cards and map pins do not load the gallery.
+- **Photos.** Uploads are checked, turned upright, shrunk to at most 1200 pixels and saved as JPEG, on disk or in Supabase Storage. The cover photo's filename is also kept on the listing so cards and map pins do not load the gallery.
 - **Tokens.** Verification and reset links are signed with `SECRET_KEY` and expire (24 hours and 1 hour). A reset link stops working once the password changes, and a verification link stops working if the email address changes. Changing a password signs out the account's other sessions.
 - **Rate limits.** Attempts are counted in the database (hashed, never raw emails or addresses), so limits hold across server processes.
 
@@ -199,7 +233,7 @@ rent_me_app/
 ├── cli.py                 # make-admin, revoke-admin, list-admins
 ├── security.py            # Emailed-link tokens, rate limits, password rules, permission checks
 ├── mailer.py              # Sending email (smtp, development mailbox)
-├── photos.py              # Storing and removing photo files
+├── photos.py              # Storing and removing photos (disk or Supabase Storage)
 ├── locations.py           # Towns and map positions
 ├── search_engine.py       # Plain-English search parser
 ├── llm_parser.py          # Optional LLM search parser (off by default)

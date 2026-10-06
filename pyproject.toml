@@ -12,6 +12,7 @@ dependencies = [
     "Werkzeug==2.3.7",
     "Flask-WTF",
     "Pillow",
+    "psycopg[binary]",
 ]
 
 [tool.vercel]

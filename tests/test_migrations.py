@@ -8,7 +8,7 @@ from config import Config
 from locations import approximate_position
 
 PREVIOUS = '0002_property_coordinates'
-HEAD = '0003_gallery_details_trust'
+HEAD = '0004_lock_down_data_api'
 
 
 @pytest.fixture

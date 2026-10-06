@@ -8,7 +8,7 @@ from app import db
 from locations import LOCATIONS, MAX_PIN_DISTANCE_KM, TOWN_COORDS, distance_km
 from models import (AMENITIES, REPORT_REASONS, STATUSES, Favorite, Message, Property, PropertyPhoto,
                     Report, utcnow)
-from photos import DEFAULT_PHOTO, delete_picture, save_picture, upload_size
+from photos import DEFAULT_PHOTO, StorageError, delete_picture, save_picture, upload_size
 from routes import SIMILAR_COUNT, bp, favorite_ids_for
 from search_engine import MAX_PRICE
 from security import is_limited, record_hit
@@ -132,11 +132,17 @@ def plan_photos(property):
 
     new_files = []
     for upload in uploads:
-        filename = save_picture(upload)
+        try:
+            filename = save_picture(upload)
+        except StorageError as error:
+            current_app.logger.error("Could not store an uploaded photo: %s", error)
+            filename, problem = None, "We couldn't save your photos just now. Please try again in a moment."
+        else:
+            problem = f"{upload.filename} isn't a photo we can read. Photos must be JPG, PNG, GIF or WebP."
         if not filename:
             for stored in new_files:
                 delete_picture(stored)
-            return None, f"{upload.filename} isn't a photo we can read. Photos must be JPG, PNG, GIF or WebP."
+            return None, problem
         new_files.append(filename)
 
     return {'kept': kept, 'new_files': new_files,

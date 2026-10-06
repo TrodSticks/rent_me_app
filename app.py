@@ -1,10 +1,11 @@
 import os
+from contextlib import contextmanager
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_migrate import Migrate, stamp, upgrade
 from flask_wtf.csrf import CSRFProtect
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 from config import BASE_DIR, Config
 
 db = SQLAlchemy()
@@ -15,6 +16,8 @@ migrate = Migrate()
 
 # The migration that matches databases created before migrations were introduced
 BASELINE_REVISION = '0001_baseline'
+# Any fixed number; names the Postgres lock held while the database is prepared
+MIGRATION_LOCK_KEY = 72_301
 
 
 def prepare_database(app):
@@ -30,14 +33,45 @@ def prepare_database(app):
         db.create_all()
         return
 
-    tables = set(inspect(db.engine).get_table_names())
-    if not tables - {'alembic_version'}:
-        db.create_all()
-        stamp()
-    else:
-        if 'alembic_version' not in tables:
-            stamp(revision=BASELINE_REVISION)
-        upgrade()
+    with migration_lock():
+        tables = set(inspect(db.engine).get_table_names())
+        if not tables - {'alembic_version'}:
+            db.create_all()
+            stamp()
+            with db.engine.begin() as connection:
+                enable_row_level_security(connection)
+        else:
+            if 'alembic_version' not in tables:
+                stamp(revision=BASELINE_REVISION)
+            upgrade()
+
+
+@contextmanager
+def migration_lock():
+    """On Postgres, let only one copy of the app prepare the database at a time.
+
+    A hosted site can start several copies at once (Vercel does); without the lock two of them
+    could both try to create the tables. SQLite databases belong to one machine, so need none.
+    """
+    if db.engine.dialect.name != 'postgresql':
+        yield
+        return
+    # A transaction-level lock, held by a transaction that stays open until the work is done.
+    # It is released even if this copy of the app dies, and works through Supabase's pooler.
+    with db.engine.connect() as connection, connection.begin():
+        connection.execute(text('SELECT pg_advisory_xact_lock(:key)'), {'key': MIGRATION_LOCK_KEY})
+        yield
+
+
+def enable_row_level_security(connection):
+    """Close the app's Postgres tables to Supabase's Data API (see migration 0004).
+
+    Safe to repeat. Does nothing on other databases.
+    """
+    if connection.dialect.name != 'postgresql':
+        return
+    for table in inspect(connection).get_table_names():
+        connection.execute(text(f'ALTER TABLE "{table}" ENABLE ROW LEVEL SECURITY'))
 
 
 def create_app():

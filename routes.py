@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 from app import db
 from locations import LOCATIONS, TOWN_COORDS
+from photos import photo_url
 from models import (AMENITIES, REPORT_REASONS, STATUSES, Favorite, Message, Property,
                     PropertyAmenity, User)
 from search_engine import MAX_PRICE, MAX_QUERY_LENGTH, PropertySearchEngine
@@ -43,6 +44,7 @@ def inject_shared_values():
         'STATUSES': STATUSES,
         'REPORT_REASONS': REPORT_REASONS,
         'filter_url': filter_url,
+        'stored_photo_url': photo_url,
         'today': date.today(),
         # The development mailbox only exists on a developer's machine
         'dev_mailbox': current_app.config['MAIL_BACKEND'] == 'file',
@@ -252,7 +254,7 @@ def make_pin(property):
         'lng': property.map_lng,
         # Exact when the landlord placed the pin; otherwise a stable spot near the town centre
         'exact': property.latitude is not None and property.longitude is not None,
-        'photo': url_for('static', filename='property_pics/' + property.image_file),
+        'photo': photo_url(property.image_file),
         'url': url_for('main.property_detail', property_id=property.id),
     }
 

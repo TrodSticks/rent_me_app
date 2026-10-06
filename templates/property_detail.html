@@ -28,7 +28,7 @@
                     {% for photo in photos %}
                         <button type="button" class="rm-gallery-slide" data-index="{{ loop.index0 }}"
                                 aria-label="Open photo {{ loop.index }} of {{ photos|length }} full screen">
-                            <img src="{{ url_for('static', filename='property_pics/' + photo.filename) }}"
+                            <img src="{{ stored_photo_url(photo.filename) }}"
                                  alt="{{ property.title }}, photo {{ loop.index }}"
                                  {{ 'loading="lazy"'|safe if not loop.first }}
                                  onerror="this.onerror=null;this.src='{{ default_photo() }}'">
@@ -64,7 +64,7 @@
                 <div class="rm-thumbs" id="gallery-thumbs" role="group" aria-label="Choose a photo">
                     {% for photo in photos %}
                         <button type="button" class="rm-thumb {{ 'active' if loop.first }}" data-index="{{ loop.index0 }}" aria-label="Show photo {{ loop.index }}">
-                            <img src="{{ url_for('static', filename='property_pics/' + photo.filename) }}" alt="" loading="lazy">
+                            <img src="{{ stored_photo_url(photo.filename) }}" alt="" loading="lazy">
                         </button>
                     {% endfor %}
                 </div>
