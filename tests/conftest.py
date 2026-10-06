@@ -1,24 +1,41 @@
 import os
 
 # Must be set before the app/routes modules are imported
+os.environ['APP_ENV'] = 'development'
 os.environ['DATABASE_URL'] = 'sqlite://'
 os.environ['USE_LLM_SEARCH'] = '0'
+os.environ['MAIL_BACKEND'] = 'memory'
+os.environ.pop('MAIL_SERVER', None)
+os.environ.pop('PUBLIC_BASE_URL', None)
 
 import pytest
+from flask import g
 from app import create_app, db
-from models import User, Property
+from models import User, Property, utcnow
+
+
+def make_user(username, role, verified=True, admin=False, password='pw123'):
+    user = User(username=username, email=f'{username}@test.com', role=role, is_admin=admin,
+                email_verified_at=utcnow() if verified else None)
+    user.set_password(password)
+    db.session.add(user)
+    return user
 
 
 @pytest.fixture
 def app(tmp_path):
     app = create_app()
     app.config.update(TESTING=True, UPLOAD_FOLDER=str(tmp_path), WTF_CSRF_ENABLED=False)
+
+    @app.before_request
+    def forget_previous_request_user():
+        # The fixture keeps one app context open for the whole test, and Flask-Login caches the
+        # signed-in user on it. Clear it so each request works out who is signed in, as it would live.
+        g.pop('_login_user', None)
+
     with app.app_context():
-        landlord = User(username='landlord', email='landlord@test.com', role='Landlord')
-        landlord.set_password('pw123')
-        renter = User(username='renter', email='renter@test.com', role='Renter')
-        renter.set_password('pw123')
-        db.session.add_all([landlord, renter])
+        landlord = make_user('landlord', 'Landlord')
+        make_user('renter', 'Renter')
         db.session.add_all([
             Property(title='Cozy flat', description='Near the mall', price=3500,
                      location='Maun', bedrooms=2, property_type='flat', landlord=landlord),
@@ -54,3 +71,9 @@ def landlord_client(client):
 def renter_client(client):
     login(client, 'renter@test.com')
     return client
+
+
+@pytest.fixture
+def outbox(app):
+    """Emails the app has sent during the test, oldest first."""
+    return app.extensions.setdefault('mail_outbox', [])

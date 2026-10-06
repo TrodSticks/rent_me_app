@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% from "_macros.html" import empty_state with context %}
+{% block content %}
+    {% call empty_state('far fa-compass', heading) %}
+        <p class="text-muted">{{ message }}</p>
+        <a href="{{ url_for('main.home') }}" class="btn btn-primary">Back to properties</a>
+    {% endcall %}
+{% endblock %}

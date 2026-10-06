@@ -50,8 +50,21 @@ def create_app():
     # render_as_batch lets SQLite change existing tables
     migrate.init_app(app, db, directory=os.path.join(BASE_DIR, 'migrations'), render_as_batch=True)
 
+    if app.config['TRUSTED_PROXY_COUNT']:
+        # Behind a reverse proxy, read the visitor's address and https status from its headers
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        hops = app.config['TRUSTED_PROXY_COUNT']
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops)
+
     from routes import bp
     app.register_blueprint(bp)
+
+    from cli import register_commands
+    register_commands(app)
+
+    if app.config['MAIL_BACKEND'] == 'disabled':
+        app.logger.warning("Email is not configured: verification and password-reset emails will not be sent. "
+                           "Set MAIL_SERVER (see README).")
 
     # Set AUTO_MIGRATE=0 to manage the database by hand with `flask --app app db ...`
     if os.environ.get('AUTO_MIGRATE', '1') != '0':

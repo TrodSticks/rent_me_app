@@ -3,10 +3,20 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 {% endblock %}
 {% block content %}
+    {% set photos = property.photos if property else [] %}
+    {% set can_publish = current_user.email_verified or (property and property.is_published) %}
     <div class="content-section">
-        <form method="POST" action="" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <form method="POST" action="" enctype="multipart/form-data" id="listing-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <fieldset>
                 <legend class="border-bottom mb-4">{{ title }}</legend>
+
+                {% if property and property.is_hidden %}
+                    <div class="alert alert-danger">
+                        <i class="fas fa-eye-slash me-2"></i>
+                        This listing has been hidden by the Rent Me team and isn't shown to renters{% if property.hidden_reason %}: {{ property.hidden_reason }}{% endif %}.
+                    </div>
+                {% endif %}
+
                 <div class="mb-3">
                     <label for="title" class="form-label">Title</label>
                     <input type="text" class="form-control" id="title" name="title" required maxlength="100"
@@ -36,14 +46,53 @@
                         </select>
                     </div>
                     <div class="col-sm-6">
+                        <label for="bedrooms" class="form-label">Bedrooms</label>
+                        <input type="number" class="form-control" id="bedrooms" name="bedrooms" min="1" max="10" required value="{{ values.bedrooms or '' }}">
+                    </div>
+                    <div class="col-sm-6">
+                        <label for="bathrooms" class="form-label">Bathrooms <span class="text-muted fw-normal">(optional)</span></label>
+                        <input type="number" class="form-control" id="bathrooms" name="bathrooms" min="0" max="20" step="1"
+                               value="{{ values.bathrooms if values.bathrooms is not none else '' }}">
+                    </div>
+                </div>
+
+                <h2 class="h6 mt-4 mb-3">Rent and availability</h2>
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-6">
                         <label for="price" class="form-label">Rent per month (Pula)</label>
                         <input type="number" class="form-control" id="price" name="price" min="1" required value="{{ values.price or '' }}">
                     </div>
                     <div class="col-sm-6">
-                        <label for="bedrooms" class="form-label">Bedrooms</label>
-                        <input type="number" class="form-control" id="bedrooms" name="bedrooms" min="1" max="10" required value="{{ values.bedrooms or '' }}">
+                        <label for="deposit" class="form-label">Security deposit (Pula) <span class="text-muted fw-normal">(optional)</span></label>
+                        <input type="number" class="form-control" id="deposit" name="deposit" min="0" step="1"
+                               value="{{ values.deposit if values.deposit is not none else '' }}" aria-describedby="deposit-help">
+                        <div class="form-text" id="deposit-help">Enter 0 if there is no deposit. Leave blank if you'd rather not say.</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <label for="status" class="form-label">Status</label>
+                        <select class="form-select" id="status" name="status" required aria-describedby="status-help">
+                            {% for key, label in STATUSES.items() %}
+                                <option value="{{ key }}" {{ 'selected' if selected_status == key }}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text" id="status-help">Only available properties appear in search and on the map.</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <label for="available_from" class="form-label">Available from <span class="text-muted fw-normal">(optional)</span></label>
+                        <input type="date" class="form-control" id="available_from" name="available_from" value="{{ values.available_from or '' }}">
                     </div>
                 </div>
+
+                <fieldset class="mb-4">
+                    <legend class="form-label">Amenities <span class="text-muted fw-normal">(choose any that apply)</span></legend>
+                    <div class="rm-check-chips">
+                        {% for key, label in AMENITIES.items() %}
+                            <input type="checkbox" class="btn-check" name="amenities" value="{{ key }}" id="amenity-{{ key }}" {{ 'checked' if key in selected_amenities }}>
+                            <label class="rm-chip" for="amenity-{{ key }}">{{ label }}</label>
+                        {% endfor %}
+                    </div>
+                </fieldset>
+
                 <div class="mb-4">
                     <span class="form-label d-block" id="pin-label">Location on the map <span class="text-muted fw-normal">(optional)</span></span>
                     <div id="pin-map" class="rm-pin-map" role="application" aria-labelledby="pin-label"></div>
@@ -58,23 +107,56 @@
                         Without a pin, the listing is shown somewhere in the town you chose.
                     </div>
                 </div>
-                <div class="mb-4">
-                    <label for="image" class="form-label">Photo</label>
-                    {% if property and property.image_file and property.image_file != 'default.jpg' %}
-                        <div class="mb-2">
-                            <img src="{{ url_for('static', filename='property_pics/' + property.image_file) }}"
-                                 alt="Current photo" style="height: 140px; border-radius: 18px; object-fit: cover;">
-                            <div class="form-text">Current photo. Choose a new file to replace it.</div>
-                        </div>
+
+                <!-- Photos -->
+                <div class="mb-4" id="photo-manager" data-max="{{ config.MAX_PHOTOS }}" data-max-bytes="{{ config.MAX_IMAGE_BYTES }}">
+                    <span class="form-label d-block">Photos <span class="text-muted fw-normal">(up to {{ config.MAX_PHOTOS }})</span></span>
+                    {% if photos %}
+                        <ul class="rm-photo-grid" id="photo-grid" aria-label="Photos on this listing">
+                            {% for photo in photos %}
+                                <li class="rm-photo-tile" data-photo-id="{{ photo.id }}">
+                                    <img src="{{ url_for('static', filename='property_pics/' + photo.filename) }}" alt="Photo {{ loop.index }}">
+                                    <input type="hidden" name="photo_order" value="{{ photo.id }}">
+                                    <span class="rm-cover-flag">Cover</span>
+                                    <div class="rm-photo-actions">
+                                        <button type="button" data-move="-1" aria-label="Move photo {{ loop.index }} earlier"><i class="fas fa-arrow-left"></i></button>
+                                        <button type="button" data-cover aria-label="Make photo {{ loop.index }} the cover" title="Make cover"><i class="fas fa-star"></i></button>
+                                        <button type="button" data-move="1" aria-label="Move photo {{ loop.index }} later"><i class="fas fa-arrow-right"></i></button>
+                                    </div>
+                                    <label class="rm-photo-remove">
+                                        <input type="checkbox" name="remove_photos" value="{{ photo.id }}"> Remove
+                                    </label>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                        <div class="form-text mb-2">The first photo is the cover, shown on cards and the map. Use the arrows to reorder, or the star to make a photo the cover.</div>
                     {% endif %}
-                    <input type="file" class="form-control" id="image" name="image"
-                           accept="image/jpeg,image/png,image/gif,image/webp">
-                    <div class="form-text">JPG, PNG, GIF or WebP, up to 5 MB.</div>
-                    <img id="image-preview" class="mt-2 d-none" alt="Preview" style="height: 140px; border-radius: 18px; object-fit: cover;">
+                    <label for="photos" class="form-label small text-muted mb-1">{{ 'Add more photos' if photos else 'Choose photos' }}</label>
+                    <input type="file" class="form-control" id="photos" name="photos" multiple
+                           accept="image/jpeg,image/png,image/gif,image/webp" aria-describedby="photos-help">
+                    <div class="form-text" id="photos-help">
+                        JPG, PNG, GIF or WebP, up to 5 MB each.{% if not photos %} The first photo you choose becomes the cover.{% endif %}
+                    </div>
+                    <p class="rm-tag amber mt-2" id="photo-warning" role="alert" hidden></p>
+                    <ul class="rm-photo-grid mt-2" id="photo-previews" aria-label="Photos you are adding"></ul>
                 </div>
             </fieldset>
+
+            {% if not can_publish %}
+                <div class="alert alert-warning">
+                    <i class="far fa-envelope me-2"></i>
+                    Confirm your email address to publish this listing. You can save it as a draft now and publish it later.
+                    <a href="{{ url_for('main.account') }}" class="alert-link">Confirm your email</a>
+                </div>
+            {% endif %}
+
             <div class="d-flex flex-wrap gap-2">
-                <button type="submit" class="btn btn-dark btn-lg">{{ "Update" if property else "Add" }} Property</button>
+                <button type="submit" name="action" value="publish" class="btn btn-dark btn-lg" {{ 'disabled' if not can_publish }}>
+                    {% if property and property.is_published %}Save changes{% elif property %}Publish listing{% else %}Add Property{% endif %}
+                </button>
+                <button type="submit" name="action" value="draft" class="btn btn-outline-secondary btn-lg">
+                    {{ 'Unpublish and keep as draft' if property and property.is_published else 'Save as draft' }}
+                </button>
                 <a href="{{ url_for('main.dashboard') }}" class="btn btn-light btn-lg">Cancel</a>
             </div>
         </form>
@@ -83,17 +165,5 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script id="pin-data" type="application/json">{{ town_coords|tojson }}</script>
     <script src="{{ url_for('static', filename='pin_picker.js') }}"></script>
-    <script>
-        // Show a preview of the chosen photo before uploading
-        document.getElementById('image').addEventListener('change', function() {
-            const preview = document.getElementById('image-preview');
-            const file = this.files[0];
-            if (file) {
-                preview.src = URL.createObjectURL(file);
-                preview.classList.remove('d-none');
-            } else {
-                preview.classList.add('d-none');
-            }
-        });
-    </script>
+    <script src="{{ url_for('static', filename='photo_manager.js') }}"></script>
 {% endblock %}

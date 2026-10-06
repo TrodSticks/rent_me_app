@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% from "_macros.html" import empty_state, admin_tabs with context %}
+{% block content %}
+    {{ admin_tabs('reports', open_count) }}
+
+    <div class="rm-switch mb-3" role="group" aria-label="Which reports">
+        <a href="{{ url_for('main.admin_reports') }}" class="{{ 'active' if status == 'open' }}">Open</a>
+        <a href="{{ url_for('main.admin_reports', status='resolved') }}" class="{{ 'active' if status == 'resolved' }}">Resolved</a>
+    </div>
+
+    {% if reports %}
+        {% for report in reports %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                        <div style="min-width: 0;">
+                            <span class="rm-tag red">{{ REPORT_REASONS.get(report.reason, report.reason) }}</span>
+                            {% if report.property.is_hidden %}<span class="rm-tag">Listing hidden</span>{% endif %}
+                            {% if not report.property.is_published %}<span class="rm-tag">Draft</span>{% endif %}
+                            <h2 class="h6 mt-2 mb-1">
+                                <a href="{{ url_for('main.property_detail', property_id=report.property.id) }}" class="text-decoration-none">{{ report.property.title }}</a>
+                            </h2>
+                            <span class="text-muted small">
+                                Reported by {{ report.reporter.username }} on {{ report.created_at.strftime('%d %b %Y, %H:%M') }} UTC
+                            </span>
+                        </div>
+                    </div>
+                    {% if report.notes %}
+                        <p class="mb-3" style="white-space: pre-line; overflow-wrap: anywhere;">{{ report.notes }}</p>
+                    {% else %}
+                        <p class="text-muted small mb-3">No notes were added.</p>
+                    {% endif %}
+
+                    {% if report.status == 'open' %}
+                        <form method="POST" action="{{ url_for('main.admin_resolve_report', report_id=report.id) }}" class="row g-2 align-items-end"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="col-md-4">
+                                <label class="form-label" for="outcome-{{ report.id }}">Outcome</label>
+                                <select class="form-select" id="outcome-{{ report.id }}" name="outcome" required>
+                                    <option value="">Choose an outcome</option>
+                                    {% for key, label in outcomes.items() %}
+                                        <option value="{{ key }}">{{ label }}{{ ' (hides it from renters)' if key == 'listing_hidden' }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="notes-{{ report.id }}">Notes (optional)</label>
+                                <input type="text" class="form-control" id="notes-{{ report.id }}" name="notes" maxlength="1000"
+                                       placeholder="What you checked and decided">
+                            </div>
+                            <div class="col-md-2 d-grid">
+                                <button type="submit" class="btn btn-dark">Resolve</button>
+                            </div>
+                        </form>
+                    {% else %}
+                        <div class="rm-row" style="box-shadow: none; background: var(--rm-surface); margin: 0;">
+                            <div class="rm-row-main">
+                                <strong>{{ outcomes.get(report.outcome, report.outcome) }}</strong>
+                                <p>
+                                    Resolved by {{ report.resolved_by.username if report.resolved_by else 'an administrator' }}
+                                    on {{ report.resolved_at.strftime('%d %b %Y, %H:%M') }} UTC{% if report.resolution_notes %}: {{ report.resolution_notes }}{% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+
+        <div class="d-flex justify-content-between">
+            {% if page > 1 %}
+                <a class="btn btn-outline-secondary" href="{{ url_for('main.admin_reports', status=status, page=page - 1) }}">Previous</a>
+            {% else %}<span></span>{% endif %}
+            {% if has_next %}
+                <a class="btn btn-outline-secondary" href="{{ url_for('main.admin_reports', status=status, page=page + 1) }}">Next</a>
+            {% endif %}
+        </div>
+    {% else %}
+        {% call empty_state('far fa-flag', 'No open reports' if status == 'open' else 'No resolved reports yet') %}
+            <p class="text-muted">Reports from renters and landlords appear here.</p>
+        {% endcall %}
+    {% endif %}
+
+    <!-- Listings hidden from renters -->
+    <div class="section-title"><h2>Hidden listings</h2></div>
+    {% if hidden %}
+        {% for property in hidden %}
+            <div class="rm-row">
+                <div class="rm-row-main">
+                    <h3><a href="{{ url_for('main.property_detail', property_id=property.id) }}">{{ property.title }}</a></h3>
+                    <p>
+                        Hidden{% if property.hidden_at %} on {{ property.hidden_at.strftime('%d %b %Y') }}{% endif %}
+                        {% if property.hidden_by %} by {{ property.hidden_by.username }}{% endif %}{% if property.hidden_reason %}: {{ property.hidden_reason }}{% endif %}
+                    </p>
+                </div>
+                <div class="rm-row-side">
+                    <form method="POST" action="{{ url_for('main.admin_restore_listing', property_id=property.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-secondary btn-sm">Restore</button>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p class="text-muted">No listings are hidden.</p>
+    {% endif %}
+{% endblock %}

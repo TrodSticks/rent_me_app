@@ -3,9 +3,11 @@
 <div class="search-container">
     <form method="GET" action="{{ url_for(view) }}" id="search-form" class="rm-search" role="search">
         {# Keep the chosen filters when running a text search #}
-        {% for key in ['property_type', 'location', 'bedrooms', 'min_price', 'max_price', 'sort'] %}
+        {% for key in ['property_type', 'location', 'bedrooms', 'bathrooms', 'min_price', 'max_price'] %}
             {% if filters[key] %}<input type="hidden" name="{{ key }}" value="{{ filters[key] }}">{% endif %}
         {% endfor %}
+        {% if filters.sort != 'newest' %}<input type="hidden" name="sort" value="{{ filters.sort }}">{% endif %}
+        {% for key in filters.amenities %}<input type="hidden" name="amenities" value="{{ key }}">{% endfor %}
         <div class="rm-search-field">
             <i class="fas fa-search"></i>
             <input type="text"
@@ -13,6 +15,7 @@
                    id="search-input"
                    name="search"
                    value="{{ search_query }}"
+                   maxlength="200"
                    placeholder="Try 'cheap 2 bedroom house in Gaborone'"
                    aria-label="Search properties"
                    autocomplete="off">
@@ -46,12 +49,18 @@
         {% if filters.bedrooms %}
             <a class="rm-tag blue" href="{{ filter_url(view, bedrooms=None) }}" aria-label="Remove bedrooms filter">{{ '5+' if filters.bedrooms >= 5 else filters.bedrooms }} bed{{ 's' if filters.bedrooms != 1 }}<i class="fas fa-times"></i></a>
         {% endif %}
+        {% if filters.bathrooms %}
+            <a class="rm-tag blue" href="{{ filter_url(view, bathrooms=None) }}" aria-label="Remove bathrooms filter">{{ filters.bathrooms }}+ bath{{ 's' if filters.bathrooms != 1 }}<i class="fas fa-times"></i></a>
+        {% endif %}
         {% if filters.min_price %}
             <a class="rm-tag blue" href="{{ filter_url(view, min_price=None) }}" aria-label="Remove minimum price">From P{{ '{:,}'.format(filters.min_price) }}<i class="fas fa-times"></i></a>
         {% endif %}
         {% if filters.max_price %}
             <a class="rm-tag blue" href="{{ filter_url(view, max_price=None) }}" aria-label="Remove maximum price">Up to P{{ '{:,}'.format(filters.max_price) }}<i class="fas fa-times"></i></a>
         {% endif %}
+        {% for key in filters.amenities %}
+            <a class="rm-tag blue" href="{{ filter_url(view, amenities=filters.amenities|reject('equalto', key)|list) }}" aria-label="Remove {{ AMENITIES[key] }} filter">{{ AMENITIES[key] }}<i class="fas fa-times"></i></a>
+        {% endfor %}
         {% if filters.sort in ['price_asc', 'price_desc'] %}
             <a class="rm-tag blue" href="{{ filter_url(view, sort=None) }}" aria-label="Remove sorting">{{ 'Cheapest first' if filters.sort == 'price_asc' else 'Most expensive first' }}<i class="fas fa-times"></i></a>
         {% endif %}
@@ -65,7 +74,7 @@
         {% if search_query %}<input type="hidden" name="search" value="{{ search_query }}">{% endif %}
         {% if filters.property_type in ['house', 'flat'] %}<input type="hidden" name="property_type" value="{{ filters.property_type }}">{% endif %}
         <div class="row g-3 align-items-end">
-            <div class="col-6 col-md-3">
+            <div class="col-12 col-md-3">
                 <label for="filter-location" class="form-label">Town</label>
                 <select class="form-select" id="filter-location" name="location">
                     <option value="">Any town</option>
@@ -84,6 +93,15 @@
                     <option value="5" {{ 'selected' if filters.bedrooms and filters.bedrooms >= 5 }}>5+</option>
                 </select>
             </div>
+            <div class="col-6 col-md-2">
+                <label for="filter-bathrooms" class="form-label">Bathrooms</label>
+                <select class="form-select" id="filter-bathrooms" name="bathrooms">
+                    <option value="">Any</option>
+                    {% for n in range(1, 4) %}
+                        <option value="{{ n }}" {{ 'selected' if filters.bathrooms == n }}>{{ n }}+</option>
+                    {% endfor %}
+                </select>
+            </div>
             <div class="col-12 col-md-3">
                 <label class="form-label" for="filter-min">Price per month (P)</label>
                 <div class="d-flex gap-2">
@@ -99,8 +117,17 @@
                     <option value="price_desc" {{ 'selected' if filters.sort == 'price_desc' }}>Price: high to low</option>
                 </select>
             </div>
-            <div class="col-12 col-md-2 d-grid">
-                <button type="submit" class="btn btn-dark">Apply</button>
+            <fieldset class="col-12">
+                <legend class="form-label">Must have</legend>
+                <div class="rm-check-chips">
+                    {% for key, label in AMENITIES.items() %}
+                        <input type="checkbox" class="btn-check" name="amenities" value="{{ key }}" id="filter-amenity-{{ key }}" {{ 'checked' if key in filters.amenities }}>
+                        <label class="rm-chip" for="filter-amenity-{{ key }}">{{ label }}</label>
+                    {% endfor %}
+                </div>
+            </fieldset>
+            <div class="col-12 col-md-3 d-grid">
+                <button type="submit" class="btn btn-dark">Apply filters</button>
             </div>
         </div>
     </form>

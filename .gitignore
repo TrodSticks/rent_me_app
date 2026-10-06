@@ -11,3 +11,6 @@ static/property_pics/*
 .claude/
 .secret_key
 *.db.bak
+.env
+mail_outbox/
+*.bak

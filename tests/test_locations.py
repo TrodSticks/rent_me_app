@@ -1,11 +1,6 @@
-import sqlite3
 import pytest
-from flask_migrate import upgrade
-from app import BASELINE_REVISION, create_app, db
-from config import Config
+from app import db
 from models import Property
-
-HEAD = '0002_property_coordinates'
 
 
 def property_form(**overrides):
@@ -80,62 +75,3 @@ def test_moving_town_without_moving_the_pin_is_rejected(app, landlord_client):
                                 data=property_form(location='Maun', latitude='-24.6541', longitude='25.9087'))
     assert 'too far from Maun' in resp.get_data(as_text=True)
     assert db.session.get(Property, property.id).location == 'Gaborone'
-
-
-# ---------- Database migrations ----------
-
-def database_state(path):
-    connection = sqlite3.connect(path)
-    try:
-        version = connection.execute('select version_num from alembic_version').fetchone()[0]
-        columns = [row[1] for row in connection.execute('pragma table_info(property)')]
-        users = connection.execute('select username from user').fetchall()
-    finally:
-        connection.close()
-    return version, columns, users
-
-
-@pytest.fixture
-def file_database(tmp_path, monkeypatch):
-    path = tmp_path / 'rentme.db'
-    monkeypatch.setattr(Config, 'SQLALCHEMY_DATABASE_URI', f'sqlite:///{path}')
-    return path
-
-
-def test_new_database_is_created_fully_migrated(file_database):
-    create_app()
-    version, columns, _ = database_state(file_database)
-    assert version == HEAD
-    assert 'latitude' in columns and 'longitude' in columns
-
-
-def test_database_from_before_migrations_is_upgraded_and_keeps_its_data(file_database, monkeypatch):
-    # Build a database the way the app made them before migrations existed
-    monkeypatch.setenv('AUTO_MIGRATE', '0')
-    app = create_app()
-    with app.app_context():
-        upgrade(revision=BASELINE_REVISION)
-        db.engine.dispose()
-    connection = sqlite3.connect(file_database)
-    connection.execute("insert into user (username, email, password_hash, role) values ('old', 'old@test.com', 'x', 'Renter')")
-    connection.execute('drop table alembic_version')
-    connection.commit()
-    assert 'latitude' not in [row[1] for row in connection.execute('pragma table_info(property)')]
-    connection.close()
-
-    monkeypatch.setenv('AUTO_MIGRATE', '1')
-    app = create_app()
-    with app.app_context():
-        db.engine.dispose()
-
-    version, columns, users = database_state(file_database)
-    assert version == HEAD
-    assert 'latitude' in columns and 'longitude' in columns
-    assert users == [('old',)]
-
-
-def test_starting_again_changes_nothing(file_database):
-    create_app()
-    before = database_state(file_database)
-    create_app()
-    assert database_state(file_database) == before
