@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import photo_url, default_photo, empty_state with context %}
+{% from "_macros.html" import photo_url, default_photo, empty_state, status_tags, money with context %}
 {% block content %}
     <div class="section-title mt-2">
         <h1>Dashboard</h1>
@@ -19,7 +19,7 @@
             <div class="rm-stat">
                 <span>Average rent</span>
                 <strong>
-                    {% if properties %}P{{ '{:,}'.format((properties|sum(attribute='price') / properties|length)|round|int) }}{% else %}P0{% endif %}
+                    {% if properties %}{{ money((properties|sum(attribute='price') / properties|length)|round|int) }}{% else %}P0{% endif %}
                 </strong>
             </div>
         </div>
@@ -45,8 +45,12 @@
                         <span class="property-detail-item"><i class="fas fa-building"></i>{{ 'Flat' if property.property_type == 'flat' else 'House' }}</span>
                     </div>
                     <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
-                        <span class="property-price">P{{ '{:,}'.format(property.price) }} <small>/ month</small></span>
-                        {% if message_counts[property.id] %}
+                        <span class="property-price">{{ money(property.price) }} <small>/ month</small></span>
+                        {% if property.is_published and not property.is_hidden and property.status == 'available' %}
+                            <span class="rm-tag green">Live</span>
+                        {% endif %}
+                        {{ status_tags(property) }}
+                        {% if message_counts.get(property.id) %}
                             <a href="{{ url_for('main.inbox', property_id=property.id) }}" class="rm-tag blue">
                                 <i class="far fa-envelope"></i>{{ message_counts[property.id] }} message{{ 's' if message_counts[property.id] != 1 else '' }}
                             </a>
@@ -57,6 +61,14 @@
                 </div>
                 <div class="rm-row-side">
                     <div class="rm-row-actions">
+                        <form action="{{ url_for('main.set_property_status', property_id=property.id) }}" method="POST" class="d-flex gap-1"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <select class="form-select form-select-sm" name="status" aria-label="Status of {{ property.title }}" onchange="this.form.submit()">
+                                {% for key, label in STATUSES.items() %}
+                                    <option value="{{ key }}" {{ 'selected' if property.status == key }}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <noscript><button type="submit" class="btn btn-outline-secondary btn-sm">Set</button></noscript>
+                        </form>
                         <a href="{{ url_for('main.update_property', property_id=property.id) }}" class="btn btn-outline-secondary btn-sm">
                             <i class="fas fa-pen me-1"></i>Edit
                         </a>

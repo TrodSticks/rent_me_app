@@ -8,16 +8,32 @@
     {{ url_for('static', filename='property_pics/default.jpg') }}
 {%- endmacro %}
 
-{# A listing card: inset photo with price and type, heart for renters, title and key facts. #}
+{% macro money(amount) -%}
+    P{{ '{:,}'.format(amount) }}
+{%- endmacro %}
+
+{# Small coloured label for a listing that isn't simply available. Prints nothing for available ones. #}
+{% macro status_tags(property) %}
+    {% if not property.is_published %}<span class="rm-tag">Draft</span>{% endif %}
+    {% if property.is_hidden %}<span class="rm-tag red">Hidden by Rent Me</span>{% endif %}
+    {% if property.status == 'reserved' %}<span class="rm-tag amber">Reserved</span>{% endif %}
+    {% if property.status == 'rented' %}<span class="rm-tag red">Rented</span>{% endif %}
+{% endmacro %}
+
+{# A listing card: inset cover photo with price and type, heart for renters, title and key facts.
+   Whether it is a favourite comes from `favorited`, or from the page's favorite_ids set, so cards
+   never run a query of their own. #}
 {% macro property_card(property, title_class='', favorited=None) %}
     <article class="property-card">
         <div class="rm-photo">
             <img src="{{ photo_url(property) }}" alt="" loading="lazy" onerror="this.onerror=null;this.src='{{ default_photo() }}'">
-            <span class="rm-pill">{{ 'Flat' if property.property_type == 'flat' else 'House' }}</span>
-            <span class="rm-price-tag">P{{ '{:,}'.format(property.price) }} <small>/ month</small></span>
+            <span class="rm-pill">
+                {%- if property.status == 'rented' %}Rented{% elif property.status == 'reserved' %}Reserved{% else %}{{ 'Flat' if property.property_type == 'flat' else 'House' }}{% endif -%}
+            </span>
+            <span class="rm-price-tag">{{ money(property.price) }} <small>/ month</small></span>
         </div>
         {% if current_user.is_authenticated and current_user.role == "Renter" %}
-            {% set is_favorited = favorited if favorited is not none else current_user.favorites.filter_by(property_id=property.id).first() %}
+            {% set is_favorited = favorited if favorited is not none else (property.id in (favorite_ids or [])) %}
             <button class="favorite-btn" type="button"
                     data-property-id="{{ property.id }}"
                     title="{{ 'Remove from favorites' if is_favorited else 'Add to favorites' }}"
@@ -30,6 +46,9 @@
             <div class="property-details mt-auto">
                 <span class="property-detail-item"><i class="fas fa-map-marker-alt"></i>{{ property.location }}</span>
                 <span class="property-detail-item"><i class="fas fa-bed"></i>{{ property.bedrooms }} bed{{ 's' if property.bedrooms != 1 else '' }}</span>
+                {% if property.bathrooms is not none %}
+                    <span class="property-detail-item"><i class="fas fa-bath"></i>{{ property.bathrooms }} bath{{ 's' if property.bathrooms != 1 else '' }}</span>
+                {% endif %}
             </div>
             <a class="stretched-link" href="{{ url_for('main.property_detail', property_id=property.id) }}" aria-label="View {{ property.title }}"></a>
         </div>
@@ -54,5 +73,34 @@
         <a href="{{ filter_url('main.map_view') }}" class="{{ 'active' if active == 'map' }}" {{ 'aria-current="page"'|safe if active == 'map' }}>
             <i class="far fa-map"></i>Map
         </a>
+    </div>
+{% endmacro %}
+
+{# The "Verified landlord" badge, with what it does and doesn't mean. #}
+{% macro landlord_badge(landlord) %}
+    {% if landlord.landlord_verified %}
+        <details class="rm-badge-note">
+            <summary class="rm-tag green"><i class="fas fa-check-circle"></i>Verified landlord</summary>
+            <p>
+                A Rent Me administrator approved this landlord's account on
+                {{ landlord.landlord_verified_at.strftime('%d %B %Y') }}.
+                Rent Me does not collect identity or ownership documents, so this badge is not a guarantee
+                about the landlord or the property. Always view a property before paying anything.
+            </p>
+        </details>
+    {% endif %}
+{% endmacro %}
+
+{# Heading and tabs for the admin pages. #}
+{% macro admin_tabs(active, open_count=None) %}
+    <div class="section-title mt-2">
+        <h1>Admin</h1>
+        <span class="rm-tag blue"><i class="fas fa-shield-alt"></i>Administrators only</span>
+    </div>
+    <div class="rm-chips mt-0" role="group" aria-label="Admin sections">
+        <a class="rm-chip {{ 'active' if active == 'reports' }}" href="{{ url_for('main.admin_reports') }}">
+            Reports{% if open_count %} ({{ open_count }}){% endif %}
+        </a>
+        <a class="rm-chip {{ 'active' if active == 'landlords' }}" href="{{ url_for('main.admin_landlords') }}">Landlords</a>
     </div>
 {% endmacro %}

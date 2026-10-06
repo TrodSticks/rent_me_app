@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "_macros.html" import empty_state, admin_tabs with context %}
+{% block content %}
+    {{ admin_tabs('landlords') }}
+
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        Marking a landlord as verified shows a "Verified landlord" badge on their listings, with your
+        username and the date recorded. Rent Me does not collect identity or ownership documents, so only
+        verify a landlord you have checked yourself.
+    </div>
+
+    <form method="GET" action="{{ url_for('main.admin_landlords') }}" class="d-flex gap-2 mb-3" style="max-width: 480px;" role="search">
+        <input type="search" class="form-control" name="q" value="{{ search }}" placeholder="Search by email or username" aria-label="Search landlords">
+        <button type="submit" class="btn btn-dark">Search</button>
+    </form>
+
+    {% if landlords %}
+        {% for landlord in landlords %}
+            <div class="rm-row">
+                <span class="rm-avatar">{{ landlord.username[0] }}</span>
+                <div class="rm-row-main">
+                    <h3>{{ landlord.username }}</h3>
+                    <p>{{ landlord.email }}</p>
+                    <div class="d-flex flex-wrap gap-2 mt-1">
+                        <span class="rm-tag {{ 'blue' if landlord.email_verified }}">{{ 'Email confirmed' if landlord.email_verified else 'Email not confirmed' }}</span>
+                        {% if landlord.landlord_verified %}
+                            <span class="rm-tag green">
+                                <i class="fas fa-check-circle"></i>Verified
+                                {{ landlord.landlord_verified_at.strftime('%d %b %Y') }}{% if landlord.landlord_verified_by %} by {{ landlord.landlord_verified_by.username }}{% endif %}
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="rm-row-side">
+                    {% if landlord.landlord_verified %}
+                        <form method="POST" action="{{ url_for('main.admin_revoke_landlord', user_id=landlord.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Remove badge</button>
+                        </form>
+                    {% else %}
+                        <form method="POST" action="{{ url_for('main.admin_verify_landlord', user_id=landlord.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-dark btn-sm">Mark as verified</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+
+        <div class="d-flex justify-content-between mt-3">
+            {% if page > 1 %}
+                <a class="btn btn-outline-secondary" href="{{ url_for('main.admin_landlords', q=search, page=page - 1) }}">Previous</a>
+            {% else %}<span></span>{% endif %}
+            {% if has_next %}
+                <a class="btn btn-outline-secondary" href="{{ url_for('main.admin_landlords', q=search, page=page + 1) }}">Next</a>
+            {% endif %}
+        </div>
+    {% else %}
+        {% call empty_state('far fa-user', 'No landlords found') %}
+            <p class="text-muted">{{ 'Try a different search.' if search else 'Landlord accounts appear here once people sign up.' }}</p>
+        {% endcall %}
+    {% endif %}
+{% endblock %}

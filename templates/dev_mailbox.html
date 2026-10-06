@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "_macros.html" import empty_state with context %}
+{% block content %}
+    <div class="section-title mt-2">
+        <h1>Development mailbox</h1>
+        <span class="rm-tag">{{ emails|length }} shown</span>
+    </div>
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        Emails aren't really sent while developing. They are saved on this computer and shown here, newest first.
+        This page only opens on the computer running the app, and doesn't exist on a live site.
+    </div>
+
+    {% if emails %}
+        {% for email in emails %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                        <div style="min-width: 0;">
+                            <strong class="d-block">{{ email.subject }}</strong>
+                            <span class="text-muted small">To {{ email.to }} &middot; {{ email.sent_at[:16]|replace('T', ' ') }} UTC</span>
+                        </div>
+                        {% if email.link %}
+                            <a href="{{ email.link }}" class="btn btn-dark btn-sm align-self-start">Open the link</a>
+                        {% endif %}
+                    </div>
+                    <pre class="rm-mail-body">{{ email.body }}</pre>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        {% call empty_state('far fa-envelope-open', 'No emails yet') %}
+            <p class="text-muted">Sign up, ask for a password reset or resend a confirmation, and the email appears here.</p>
+        {% endcall %}
+    {% endif %}
+{% endblock %}
