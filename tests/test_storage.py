@@ -161,3 +161,12 @@ def test_without_supabase_settings_photos_stay_on_disk(app, landlord_client):
     html = landlord_client.get(f'/property/{listing.id}').get_data(as_text=True)
     assert f'/static/property_pics/{listing.image_file}' in html
     db.session.remove()
+
+
+def test_storage_errors_say_what_supabase_answered(app, storage, landlord_client, caplog):
+    storage.fail = True
+    post(landlord_client, '/property/new', title='Outage', photos=[upload('a.jpg', JPG)])
+    message = ' '.join(record.getMessage() for record in caplog.records)
+    assert '500 from POST' in message and '/storage/v1/object/property-photos/' in message
+    assert '"down"' in message
+    assert 'service-key' not in message
