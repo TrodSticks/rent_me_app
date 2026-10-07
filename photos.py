@@ -50,8 +50,13 @@ def _storage_request(method, url, body=None, content_type=None):
     try:
         with urllib.request.urlopen(request, timeout=STORAGE_TIMEOUT) as response:
             return response.read()
+    except urllib.error.HTTPError as error:
+        # Supabase explains the problem in the body (e.g. "Bucket not found"); the address shows
+        # which project and bucket were asked. Neither contains the key.
+        detail = error.read(300).decode('utf-8', 'replace')
+        raise StorageError(f"{error.code} from {method} {url}: {detail}") from error
     except (urllib.error.URLError, OSError) as error:
-        raise StorageError(str(error)) from error
+        raise StorageError(f"{error} ({method} {url})") from error
 
 
 def photo_url(filename):
