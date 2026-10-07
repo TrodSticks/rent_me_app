@@ -170,3 +170,16 @@ def test_storage_errors_say_what_supabase_answered(app, storage, landlord_client
     assert '500 from POST' in message and '/storage/v1/object/property-photos/' in message
     assert '"down"' in message
     assert 'service-key' not in message
+
+
+@pytest.mark.parametrize('given', [
+    'https://abcd.supabase.co', 'https://abcd.supabase.co/', 'https://abcd.supabase.co/rest/v1',
+    'https://abcd.supabase.co/rest/v1/', ' abcd.supabase.co '])
+def test_supabase_url_keeps_only_the_project_address(monkeypatch, given):
+    monkeypatch.setenv('SUPABASE_URL', given)
+    assert config._supabase_url() == 'https://abcd.supabase.co'
+
+
+def test_supabase_url_empty_when_unset(monkeypatch):
+    monkeypatch.delenv('SUPABASE_URL', raising=False)
+    assert config._supabase_url() == ''

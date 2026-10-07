@@ -1,5 +1,6 @@
 import os
 import secrets
+from urllib.parse import urlsplit
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -102,6 +103,18 @@ def _engine_options(url):
     return options
 
 
+def _supabase_url():
+    """SUPABASE_URL reduced to https://<project>.supabase.co.
+
+    Supabase shows the address with /rest/v1 on the end in places; that path breaks Storage calls.
+    """
+    url = os.environ.get('SUPABASE_URL', '').strip()
+    if not url:
+        return ''
+    parts = urlsplit(url if '://' in url else 'https://' + url)
+    return f"{parts.scheme}://{parts.netloc}"
+
+
 DATABASE_URL = _database_url()
 
 
@@ -116,7 +129,7 @@ class Config:
     UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER') or os.path.join(BASE_DIR, 'static', 'property_pics')
     # Supabase Storage for photos. Without these, photos are saved in UPLOAD_FOLDER.
     # The service role key is a server-side secret: set it only in the server's environment.
-    SUPABASE_URL = os.environ.get('SUPABASE_URL', '').strip().rstrip('/')
+    SUPABASE_URL = _supabase_url()
     SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
     SUPABASE_STORAGE_BUCKET = os.environ.get('SUPABASE_STORAGE_BUCKET', 'property-photos').strip()
     MAX_IMAGE_BYTES = MAX_IMAGE_BYTES
