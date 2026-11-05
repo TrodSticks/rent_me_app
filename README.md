@@ -6,6 +6,8 @@ Built with Flask, SQLAlchemy and Flask-Migrate.
 
 ## Production-readiness audit
 
+Start with the [Gaborone-first launch roadmap](docs/LAUNCH_ROADMAP.md) for the delivery order, fake-data and stress-test plan, and public-launch requirements.
+
 See the [14 October 2026 technical audit](docs/TECHNICAL_AUDIT.md) and
 [architecture, backup and monitoring plan](docs/ARCHITECTURE_PLAN.md) for verified
 implementation evidence, blocked live checks and prioritized work before launch.
