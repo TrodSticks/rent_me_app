@@ -5,8 +5,14 @@ os.environ['APP_ENV'] = 'development'
 os.environ['DATABASE_URL'] = 'sqlite://'
 os.environ['USE_LLM_SEARCH'] = '0'
 os.environ['MAIL_BACKEND'] = 'memory'
-os.environ.pop('MAIL_SERVER', None)
-os.environ.pop('PUBLIC_BASE_URL', None)
+# Empty values prevent config.py from loading real services from the developer's .env.
+# In particular, photo tests must never upload to or delete from a live bucket.
+os.environ['MAIL_SERVER'] = ''
+os.environ['PUBLIC_BASE_URL'] = ''
+os.environ['SUPABASE_URL'] = ''
+os.environ['SUPABASE_SERVICE_ROLE_KEY'] = ''
+os.environ['SECRET_KEY'] = 'isolated-test-key-not-for-deployment'
+os.environ['AUTO_MIGRATE'] = '1'
 
 import pytest
 from flask import g

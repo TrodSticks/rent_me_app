@@ -4,6 +4,13 @@ A web application for renting property in Botswana. Renters search, filter and b
 
 Built with Flask, SQLAlchemy and Flask-Migrate.
 
+## Production-readiness audit
+
+See the [14 October 2026 technical audit](docs/TECHNICAL_AUDIT.md) and
+[architecture, backup and monitoring plan](docs/ARCHITECTURE_PLAN.md) for verified
+implementation evidence, blocked live checks and prioritized work before launch.
+The presence of a feature below does not mean its production setup has been verified.
+
 ## Features
 
 ### For renters
