@@ -7,7 +7,7 @@ import pytest
 from app import db
 from conftest import login
 from models import Property
-from test_photos import JPG, new_listing, post, stored, upload
+from test_photos import JPG, make_image, new_listing, post, stored, upload
 
 import config
 
@@ -72,6 +72,9 @@ class FakeStorage:
                 if storage.fail:
                     return self._reply(500, b'{"error": "down"}')
                 prefix = '/storage/v1/object/property-photos'
+                if self.command == 'GET' and self.path.startswith(prefix + '/'):
+                    data = storage.objects.get(self.path[len(prefix) + 1:])
+                    return self._reply(404) if data is None else self._reply(200, data)
                 if self.command == 'POST' and self.path.startswith(prefix + '/'):
                     storage.objects[self.path[len(prefix) + 1:]] = body
                     return self._reply(200)
@@ -81,7 +84,7 @@ class FakeStorage:
                     return self._reply(200, b'[]')
                 return self._reply(404)
 
-            do_POST = do_DELETE = _handle
+            do_POST = do_DELETE = do_GET = _handle
 
         self.server = HTTPServer(('127.0.0.1', 0), Handler)
         self.url = f'http://127.0.0.1:{self.server.server_port}'
@@ -125,6 +128,17 @@ def test_pages_load_photos_from_the_bucket(app, storage, landlord_client):
     assert public in landlord_client.get('/').get_data(as_text=True)
     pins = landlord_client.get('/api/map-pins?bbox=-27,19,-17,30').get_json()
     assert public in [pin['photo'] for pin in pins['pins']]
+
+
+def test_remote_duplicate_rejection_preserves_existing_objects(app, storage, landlord_client):
+    listing = new_listing(landlord_client)
+    before = dict(storage.objects)
+    response = post(landlord_client, f'/property/{listing.id}/update',
+                    photos=[upload('new.png'), upload('copy.png', make_image(colour=(20, 40, 80)))])
+    assert 'duplicate photo' in response.get_data(as_text=True)
+    assert storage.objects == before
+    db.session.expire_all()
+    assert len(db.session.get(Property, listing.id).photos) == 1
 
 
 def test_listing_without_photos_uses_the_bundled_default(app, storage, landlord_client):

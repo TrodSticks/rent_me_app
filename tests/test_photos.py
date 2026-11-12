@@ -37,7 +37,7 @@ def stored(app):
 
 def new_listing(client, count=1, **fields):
     """Create a listing with `count` photos and return it."""
-    post(client, '/property/new', photos=[upload(f'p{i}.png') for i in range(count)], **fields)
+    post(client, '/property/new', photos=[upload(f'p{i}.png', make_image(colour=(20 + i * 20, 40, 80))) for i in range(count)], **fields)
     return Property.query.filter_by(title=fields.get('title', 'New place')).one()
 
 
@@ -47,6 +47,31 @@ def filenames(property):
 
 
 # ---------- Uploading ----------
+
+def test_duplicate_uploads_with_different_names_save_nothing(app, landlord_client):
+    response = post(landlord_client, '/property/new', photos=[upload('one.png'), upload('renamed.png')])
+    assert 'duplicate photo' in response.get_data(as_text=True)
+    assert Property.query.filter_by(title='New place').first() is None
+    assert stored(app) == []
+
+
+def test_duplicate_of_existing_photo_preserves_listing(app, landlord_client):
+    property = new_listing(landlord_client)
+    before = filenames(property)
+    response = post(landlord_client, f'/property/{property.id}/update',
+                    photos=[upload('renamed.png', make_image(colour=(20, 40, 80)))])
+    assert 'duplicate photo' in response.get_data(as_text=True)
+    assert filenames(property) == before
+    assert stored(app) == sorted(before)
+
+
+def test_replacing_removed_photo_with_same_image_is_allowed(app, landlord_client):
+    property = new_listing(landlord_client)
+    response = post(landlord_client, f'/property/{property.id}/update',
+                    remove_photos=[str(property.photos[0].id)],
+                    photos=[upload('replacement.png', make_image(colour=(20, 40, 80)))])
+    assert response.status_code == 302
+    assert len(filenames(property)) == len(stored(app)) == 1
 
 def test_new_property_with_photo(app, landlord_client):
     resp = post(landlord_client, '/property/new', photos=[upload()])

@@ -1,5 +1,6 @@
 """Storing listing photos: on disk, or in Supabase Storage when it is configured."""
 import io
+import hashlib
 import json
 import os
 import secrets
@@ -18,6 +19,23 @@ STORAGE_TIMEOUT = 15  # seconds
 
 class StorageError(Exception):
     """A photo could not be sent to (or removed from) the photo store."""
+
+
+class DuplicatePhoto(Exception):
+    """The listing already contains this photo."""
+
+
+def stored_photo_digest(filename):
+    """Hash the stored JPEG, including photos uploaded before duplicate checks existed."""
+    try:
+        if remote_storage():
+            data = _storage_request('GET', _object_url('object', current_app.config['SUPABASE_STORAGE_BUCKET'], filename))
+        else:
+            with open(os.path.join(current_app.config['UPLOAD_FOLDER'], filename), 'rb') as source:
+                data = source.read()
+        return hashlib.sha256(data).hexdigest()
+    except OSError as error:
+        raise StorageError('Could not read an existing photo') from error
 
 
 def upload_size(file_storage):
@@ -67,7 +85,7 @@ def photo_url(filename):
     return url_for('static', filename='property_pics/' + filename)
 
 
-def save_picture(file_storage):
+def save_picture(file_storage, seen=None):
     """Shrink an uploaded photo and store it as a JPEG under a random name.
 
     Returns the filename, or None if the upload isn't a readable image.
@@ -87,17 +105,24 @@ def save_picture(file_storage):
     except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
         return None
 
+    buffer = io.BytesIO()
+    image.save(buffer, 'JPEG', quality=JPEG_QUALITY, optimize=True)
+    data = buffer.getvalue()
+    digest = hashlib.sha256(data).hexdigest()
+    if seen is not None:
+        if digest in seen:
+            raise DuplicatePhoto()
+        seen.add(digest)
     filename = f"{secrets.token_hex(7)}.jpg"
     if remote_storage():
-        buffer = io.BytesIO()
-        image.save(buffer, 'JPEG', quality=JPEG_QUALITY, optimize=True)
         _storage_request('POST', _object_url('object', current_app.config['SUPABASE_STORAGE_BUCKET'], filename),
-                         body=buffer.getvalue(), content_type='image/jpeg')
+                         body=data, content_type='image/jpeg')
         return filename
 
     folder = current_app.config['UPLOAD_FOLDER']
     os.makedirs(folder, exist_ok=True)
-    image.save(os.path.join(folder, filename), 'JPEG', quality=JPEG_QUALITY, optimize=True)
+    with open(os.path.join(folder, filename), 'wb') as destination:
+        destination.write(data)
     return filename
 
 

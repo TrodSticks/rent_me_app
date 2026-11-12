@@ -8,7 +8,8 @@ from app import db
 from locations import LOCATIONS, MAX_PIN_DISTANCE_KM, TOWN_COORDS, distance_km
 from models import (AMENITIES, REPORT_REASONS, STATUSES, Favorite, Message, Property, PropertyPhoto,
                     Report, utcnow)
-from photos import DEFAULT_PHOTO, StorageError, delete_picture, save_picture, upload_size
+from photos import (DEFAULT_PHOTO, DuplicatePhoto, StorageError, delete_picture,
+                    save_picture, stored_photo_digest, upload_size)
 from routes import SIMILAR_COUNT, bp, favorite_ids_for
 from search_engine import MAX_PRICE
 from security import is_limited, record_hit
@@ -130,10 +131,16 @@ def plan_photos(property):
         if upload_size(upload) > current_app.config['MAX_IMAGE_BYTES']:
             return None, f"{upload.filename} is larger than 5 MB. Please choose a smaller photo."
 
+    try:
+        seen = {stored_photo_digest(photo.filename) for photo in kept} if uploads else set()
+    except StorageError:
+        return None, "We couldn't check your existing photos just now. Please try again in a moment."
     new_files = []
     for upload in uploads:
         try:
-            filename = save_picture(upload)
+            filename = save_picture(upload, seen=seen)
+        except DuplicatePhoto:
+            filename, problem = None, f"{upload.filename} is a duplicate photo. Keep only one copy of each photo in this listing."
         except StorageError as error:
             current_app.logger.error("Could not store an uploaded photo: %s", error)
             filename, problem = None, "We couldn't save your photos just now. Please try again in a moment."
