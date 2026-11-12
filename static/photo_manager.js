@@ -9,6 +9,8 @@
     const input = document.getElementById('photos');
     const previews = document.getElementById('photo-previews');
     const warning = document.getElementById('photo-warning');
+    const count = document.getElementById('photo-count');
+    const removalNotice = document.getElementById('photo-removal-notice');
     const maxPhotos = Number(manager.dataset.max);
     const maxBytes = Number(manager.dataset.maxBytes);
 
@@ -30,7 +32,9 @@
 
         grid.addEventListener('change', event => {
             if (event.target.name === 'remove_photos') {
-                event.target.closest('.rm-photo-tile').classList.toggle('is-removed', event.target.checked);
+                const tile = event.target.closest('.rm-photo-tile');
+                tile.classList.toggle('is-removed', event.target.checked);
+                tile.querySelector('.remove-label').textContent = event.target.checked ? 'Undo removal' : 'Remove photo';
                 check();
             }
         });
@@ -45,6 +49,12 @@
         const files = [...input.files];
         const tooBig = files.filter(file => file.size > maxBytes).map(file => file.name);
         const total = keptCount() + files.length;
+        if (count) count.textContent = `${total} of ${maxPhotos} photos after saving`;
+        if (removalNotice) {
+            const removed = grid.querySelectorAll('input[name="remove_photos"]:checked').length;
+            removalNotice.hidden = removed === 0;
+            removalNotice.textContent = `${removed} photo${removed === 1 ? '' : 's'} marked for removal. Save your changes below to apply. Select Undo removal to keep a photo.`;
+        }
         let message = '';
         if (tooBig.length) {
             message = `Larger than 5 MB: ${tooBig.join(', ')}. Choose smaller photos.`;
@@ -71,4 +81,12 @@
         }));
         check();
     });
+    if (grid) {
+        grid.querySelectorAll('input[name="remove_photos"]').forEach(box => {
+            const tile = box.closest('.rm-photo-tile');
+            tile.classList.toggle('is-removed', box.checked);
+            tile.querySelector('.remove-label').textContent = box.checked ? 'Undo removal' : 'Remove photo';
+        });
+    }
+    check();
 })();

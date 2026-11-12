@@ -111,6 +111,7 @@
                 <!-- Photos -->
                 <div class="mb-4" id="photo-manager" data-max="{{ config.MAX_PHOTOS }}" data-max-bytes="{{ config.MAX_IMAGE_BYTES }}">
                     <span class="form-label d-block">Photos <span class="text-muted fw-normal">(up to {{ config.MAX_PHOTOS }})</span></span>
+                    <p class="form-text" id="photo-count" aria-live="polite">{{ photos|length }} of {{ config.MAX_PHOTOS }} photos</p>
                     {% if photos %}
                         <ul class="rm-photo-grid" id="photo-grid" aria-label="Photos on this listing">
                             {% for photo in photos %}
@@ -124,12 +125,14 @@
                                         <button type="button" data-move="1" aria-label="Move photo {{ loop.index }} later"><i class="fas fa-arrow-right"></i></button>
                                     </div>
                                     <label class="rm-photo-remove">
-                                        <input type="checkbox" name="remove_photos" value="{{ photo.id }}"> Remove
+                                        <input type="checkbox" name="remove_photos" value="{{ photo.id }}" aria-label="Remove photo {{ loop.index }} when saving"> <span class="remove-label">Remove photo</span>
                                     </label>
                                 </li>
                             {% endfor %}
                         </ul>
                         <div class="form-text mb-2">The first photo is the cover, shown on cards and the map. Use the arrows to reorder, or the star to make a photo the cover.</div>
+                        <p class="form-text">Select Remove photo, then save your changes below. Nothing is removed until you save.</p>
+                        <p class="alert alert-warning" id="photo-removal-notice" role="status" hidden></p>
                     {% endif %}
                     <label for="photos" class="form-label small text-muted mb-1">{{ 'Add more photos' if photos else 'Choose photos' }}</label>
                     <input type="file" class="form-control" id="photos" name="photos" multiple
@@ -155,7 +158,7 @@
                     {% if property and property.is_published %}Save changes{% elif property %}Publish listing{% else %}Add Property{% endif %}
                 </button>
                 <button type="submit" name="action" value="draft" class="btn btn-outline-secondary btn-lg">
-                    {{ 'Unpublish and keep as draft' if property and property.is_published else 'Save as draft' }}
+                    {% if property and property.is_published %}Unpublish and keep as draft{% elif property %}Save changes — keep as draft{% else %}Save as draft{% endif %}
                 </button>
                 <a href="{{ url_for('main.dashboard') }}" class="btn btn-light btn-lg">Cancel</a>
             </div>
