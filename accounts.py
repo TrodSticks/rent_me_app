@@ -50,6 +50,8 @@ def send_reset_email(user):
 def _verification_sent_message(user, sent):
     if sent:
         return f"We've sent a link to {user.email}. Open it to confirm your email address.", "success"
+    if mail_enabled():
+        return ("We couldn't send your confirmation email right now. Please try again later."), "warning"
     return ("Email isn't set up on this server yet, so we couldn't send a confirmation link. "
             "Please try again later."), "warning"
 
