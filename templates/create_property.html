@@ -95,7 +95,8 @@
 
                 <div class="mb-4">
                     <span class="form-label d-block" id="pin-label">Location on the map <span class="text-muted fw-normal">(optional)</span></span>
-                    <div id="pin-map" class="rm-pin-map" role="application" aria-labelledby="pin-label"></div>
+                    <button type="button" class="btn btn-outline-secondary mb-2" id="pin-edit" aria-controls="pin-map" aria-pressed="false">Adjust property location</button>
+                    <div id="pin-map" class="rm-pin-map is-locked" inert role="application" aria-labelledby="pin-label"></div>
                     <input type="hidden" name="latitude" id="latitude" value="{{ values.latitude or '' }}">
                     <input type="hidden" name="longitude" id="longitude" value="{{ values.longitude or '' }}">
                     <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
@@ -103,7 +104,7 @@
                         <button type="button" class="btn btn-light btn-sm" id="pin-clear" hidden>Remove pin</button>
                     </div>
                     <div class="form-text">
-                        Tap the map to mark where the property is, and drag the pin to adjust it. Renters see this spot on the map.
+                        <span id="pin-instructions" aria-live="polite">Map locked — scroll freely over it. Choose Adjust property location to move the map or change the pin.</span> Renters see this spot on the map.
                         Without a pin, the listing is shown somewhere in the town you chose.
                     </div>
                 </div>

@@ -1284,6 +1284,13 @@ fieldset legend.form-label { float: none; width: auto; font-size: 0.9rem; }
 
 .rm-photo-grid:empty { display: none; }
 
+/* A locked map must let touch and wheel gestures reach the page. */
+.rm-pin-map.is-locked,
+.rm-pin-map.is-locked * {
+    pointer-events: none !important;
+    touch-action: auto !important;
+}
+
 .rm-photo-tile {
     position: relative;
     border: 1px solid var(--rm-border);
