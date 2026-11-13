@@ -1318,6 +1318,23 @@ fieldset legend.form-label { float: none; width: auto; font-size: 0.9rem; }
 .rm-cover-flag { display: none; }
 .rm-photo-tile:first-child .rm-cover-flag { display: inline-block; }
 .rm-new-flag { background: var(--rm-navy); }
+.rm-remove-new-photo {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 6px;
+    border: 0;
+    border-top: 1px solid #E2E8F0;
+    background: #FFF;
+    color: #B42318;
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.rm-remove-new-photo:hover { background: #FFF1F0; }
+.rm-remove-new-photo:focus-visible { outline: 3px solid #2563EB; outline-offset: -3px; }
+.rm-remove-new-photo:disabled { opacity: 0.5; cursor: wait; }
 
 .rm-photo-actions { display: flex; border-top: 1px solid var(--rm-border); }
 

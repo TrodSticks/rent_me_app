@@ -65,7 +65,7 @@
         warning.hidden = !message;
     }
 
-    input.addEventListener('change', () => {
+    function renderPreviews() {
         previews.replaceChildren(...[...input.files].map((file, index) => {
             const tile = document.createElement('li');
             tile.className = 'rm-photo-tile is-new';
@@ -76,11 +76,30 @@
             const flag = document.createElement('span');
             flag.className = 'rm-new-flag';
             flag.textContent = 'New';
-            tile.append(image, flag);
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'rm-remove-new-photo';
+            remove.textContent = 'Remove photo';
+            remove.setAttribute('aria-label', `Remove new photo ${index + 1}: ${file.name}`);
+            remove.addEventListener('click', () => {
+                if (input.disabled) return;
+                // Keep the real file input in sync: both direct uploads and ordinary form
+                // submission must send only the photos still shown in the preview.
+                const remaining = new DataTransfer();
+                [...input.files].forEach((selected, selectedIndex) => {
+                    if (selectedIndex !== index) remaining.items.add(selected);
+                });
+                input.files = remaining.files;
+                renderPreviews();
+                const buttons = previews.querySelectorAll('.rm-remove-new-photo');
+                (buttons[Math.min(index, buttons.length - 1)] || input).focus();
+            });
+            tile.append(image, flag, remove);
             return tile;
         }));
         check();
-    });
+    }
+    input.addEventListener('change', renderPreviews);
     if (grid) {
         grid.querySelectorAll('input[name="remove_photos"]').forEach(box => {
             const tile = box.closest('.rm-photo-tile');
