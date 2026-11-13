@@ -18,7 +18,8 @@ function browser({failUpload = false, saveError = false} = {}) {
     let redirect;
     const manager = {dataset: {direct: 'true', listingId: '10', max: '10', maxBytes: '5242880'},
                      append() {}, querySelectorAll() { return [{}, {}]; }};
-    const form = {elements: {csrf_token: csrf}, action: '/property/10/update',
+    const form = {elements: {csrf_token: csrf}, action: {namedButtons: true},
+        getAttribute(name) { assert.equal(name, 'action'); return '/property/10/update'; },
         addEventListener(name, fn) { listeners[name] = fn; },
         querySelectorAll() { return controls; }};
     const elements = {'photo-manager': manager, 'listing-form': form, photos: input, 'photo-warning': warning};
@@ -50,6 +51,7 @@ function browser({failUpload = false, saveError = false} = {}) {
             } else if (url.endsWith('/finish')) {
                 data = {id: url.split('/')[3], ready: true};
             } else {
+                assert.equal(url, '/property/10/update');
                 saves.push(options.body);
                 if (saveError) { saveError = false; data = {error: 'Correct the price.'}; ok = false; }
                 else data = {redirect: '/dashboard'};

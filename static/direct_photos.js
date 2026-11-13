@@ -103,7 +103,8 @@
                 body.append('photo_upload_ids', receipt.id);
             }
             progress.textContent = 'Photos checked. Saving your listing…';
-            const result = await jsonRequest(form.action || window.location.href, body, true);
+            // Buttons named "action" shadow form.action with a RadioNodeList in real browsers.
+            const result = await jsonRequest(form.getAttribute('action') || window.location.href, body, true);
             window.location.assign(result.redirect);
         } catch (error) {
             warning.textContent = error.message || 'Could not save. Check your connection and try again.';
