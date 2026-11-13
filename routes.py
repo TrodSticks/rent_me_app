@@ -72,7 +72,8 @@ def not_found(e):
 
 @bp.app_errorhandler(CSRFError)
 def csrf_failed(e):
-    if request.path.startswith('/favorite/'):
+    if (request.path.startswith(('/favorite/', '/api/photo-uploads')) or
+            request.headers.get('X-Photo-Upload') == 'direct'):
         return jsonify({"error": "Your session expired. Reload the page and try again."}), 400
     flash("That form expired or came from another site. Please try again.", "danger")
     return redirect(request.referrer if is_safe_redirect(request.referrer) else url_for("main.home"))
@@ -504,3 +505,4 @@ def send_reply(recipient_id):
 import listings   # noqa: E402,F401  property pages, the landlord dashboard and reporting
 import accounts   # noqa: E402,F401  sign-up, sign-in, email verification and password recovery
 import admin      # noqa: E402,F401  moderation and landlord verification
+import photo_uploads  # noqa: E402,F401  scoped direct-to-storage uploads

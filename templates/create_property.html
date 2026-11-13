@@ -110,9 +110,14 @@
                 </div>
 
                 <!-- Photos -->
-                <div class="mb-4" id="photo-manager" data-max="{{ config.MAX_PHOTOS }}" data-max-bytes="{{ config.MAX_IMAGE_BYTES }}">
+                <div class="mb-4" id="photo-manager" data-max="{{ config.MAX_PHOTOS }}" data-max-bytes="{{ config.MAX_IMAGE_BYTES }}"
+                     data-direct="{{ 'true' if direct_uploads else 'false' }}" data-listing-id="{{ property.id if property else '' }}">
                     <span class="form-label d-block">Photos <span class="text-muted fw-normal">(up to {{ config.MAX_PHOTOS }})</span></span>
                     <p class="form-text" id="photo-count" aria-live="polite">{{ photos|length }} of {{ config.MAX_PHOTOS }} photos</p>
+                    {% if direct_uploads %}
+                    <p class="form-text">Photos upload one at a time when you save. Keep this page open until saving finishes. If your connection drops, press Save again to retry.</p>
+                    <noscript><p class="alert alert-warning">Enable JavaScript to upload several photos reliably.</p></noscript>
+                    {% endif %}
                     {% if photos %}
                         <ul class="rm-photo-grid" id="photo-grid" aria-label="Photos on this listing">
                             {% for photo in photos %}
@@ -170,4 +175,5 @@
     <script id="pin-data" type="application/json">{{ town_coords|tojson }}</script>
     <script src="{{ url_for('static', filename='pin_picker.js') }}"></script>
     <script src="{{ url_for('static', filename='photo_manager.js') }}"></script>
+    {% if direct_uploads %}<script src="{{ url_for('static', filename='direct_photos.js') }}"></script>{% endif %}
 {% endblock %}

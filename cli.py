@@ -17,6 +17,14 @@ def _find(email):
 
 
 def register_commands(app):
+    @app.cli.command('cleanup-photo-uploads')
+    def cleanup_photo_uploads():
+        """Remove up to 100 expired private uploads and unused gallery copies."""
+        from photo_uploads import cleanup_uploads, enabled
+        if not enabled():
+            raise click.ClickException('Supabase direct uploads are not configured.')
+        click.echo(f'Removed {cleanup_uploads(limit=100)} expired upload receipts.')
+
     @app.cli.command("make-admin")
     @click.argument("email")
     def make_admin(email):

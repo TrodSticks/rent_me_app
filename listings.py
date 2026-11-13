@@ -1,7 +1,7 @@
 """Property pages: creating and editing listings, their photos, the dashboard and reporting."""
 import math
 from datetime import date
-from flask import abort, current_app, flash, redirect, render_template, request, url_for
+from flask import abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import case, func, select
 from app import db
@@ -123,18 +123,23 @@ def plan_photos(property):
 
     # "image" is the old single-photo field, still accepted
     uploads = [f for f in request.files.getlist("photos") + request.files.getlist("image") if f and f.filename]
+    direct_ids = request.form.getlist('photo_upload_ids')
     max_photos = current_app.config['MAX_PHOTOS']
-    if len(kept) + len(uploads) > max_photos:
+    if len(kept) + len(uploads) + len(direct_ids) > max_photos:
         return None, (f"A listing can have up to {max_photos} photos. "
-                      f"This would make {len(kept) + len(uploads)}; remove some and try again.")
+                      f"This would make {len(kept) + len(uploads) + len(direct_ids)}; remove some and try again.")
     for upload in uploads:
         if upload_size(upload) > current_app.config['MAX_IMAGE_BYTES']:
             return None, f"{upload.filename} is larger than 5 MB. Please choose a smaller photo."
 
     try:
-        seen = {stored_photo_digest(photo.filename) for photo in kept} if uploads else set()
+        seen = {stored_photo_digest(photo.filename) for photo in kept} if uploads or direct_ids else set()
     except StorageError:
         return None, "We couldn't check your existing photos just now. Please try again in a moment."
+    from photo_uploads import claim_uploads
+    receipts, error = claim_uploads(direct_ids, property, seen)
+    if error:
+        return None, error
     new_files = []
     for upload in uploads:
         try:
@@ -152,7 +157,8 @@ def plan_photos(property):
             return None, problem
         new_files.append(filename)
 
-    return {'kept': kept, 'new_files': new_files,
+    return {'kept': kept, 'new_files': new_files + [row.filename for row in receipts],
+            'multipart_files': new_files, 'receipts': receipts,
             'delete_files': [by_id[photo_id].filename for photo_id in removed]}, None
 
 
@@ -178,6 +184,11 @@ def apply_listing(property, cleaned, plan):
 
 def save_listing(property, is_new):
     """Validate the form, then save the listing and its photos. Returns an error message or None."""
+    if not is_new:
+        # Serialize edits so concurrent tabs cannot overwrite each other's gallery or exceed its limit.
+        db.session.execute(select(Property).where(Property.id == property.id).with_for_update()
+                           .execution_options(populate_existing=True)).scalar_one()
+        db.session.expire(property, ['photos'])
     cleaned, error = read_listing_form()
     if error:
         return error
@@ -191,13 +202,15 @@ def save_listing(property, is_new):
         return error
     try:
         apply_listing(property, cleaned, plan)
+        for row in plan['receipts']:
+            row.claimed = True
         if is_new:
             property.landlord_id = current_user.id
             db.session.add(property)
         db.session.commit()
     except Exception:
         db.session.rollback()
-        for filename in plan['new_files']:
+        for filename in plan['multipart_files']:
             delete_picture(filename)
         raise
     # Only once the change is saved is it safe to remove the files it no longer uses
@@ -209,8 +222,10 @@ def save_listing(property, is_new):
 def _form_page(title, property=None):
     """The listing form, keeping whatever was typed when it is shown again after an error."""
     submitted = request.method == "POST"
+    from photo_uploads import enabled
     return render_template(
         "create_property.html", title=title, property=property,
+        direct_uploads=enabled(),
         values=request.form if submitted else (property or {}),
         selected_amenities=request.form.getlist("amenities") if submitted else (property.amenities if property else []),
         selected_status=request.form.get("status") if submitted else (property.status if property else 'available'),
@@ -244,10 +259,15 @@ def new_property():
         property = Property()
         error = save_listing(property, is_new=True)
         if error:
+            db.session.rollback()
+            if request.headers.get('X-Photo-Upload') == 'direct':
+                return jsonify(error=error), 400
             flash(error, "danger")
             return _form_page("New Property")
         flash("Your property has been listed!" if property.is_published
               else "Your draft has been saved. It isn't visible to renters yet.", "success")
+        if request.headers.get('X-Photo-Upload') == 'direct':
+            return jsonify(redirect=url_for('main.dashboard'))
         return redirect(url_for("main.dashboard"))
     return _form_page("New Property")
 
@@ -262,9 +282,13 @@ def update_property(property_id):
         error = save_listing(property, is_new=False)
         if error:
             db.session.rollback()
+            if request.headers.get('X-Photo-Upload') == 'direct':
+                return jsonify(error=error), 400
             flash(error, "danger")
             return _form_page("Update Property", property)
         flash("Your property has been updated!", "success")
+        if request.headers.get('X-Photo-Upload') == 'direct':
+            return jsonify(redirect=url_for('main.dashboard'))
         return redirect(url_for("main.dashboard"))
     return _form_page("Update Property", property)
 

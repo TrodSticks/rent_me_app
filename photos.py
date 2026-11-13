@@ -20,6 +20,10 @@ STORAGE_TIMEOUT = 15  # seconds
 class StorageError(Exception):
     """A photo could not be sent to (or removed from) the photo store."""
 
+    def __init__(self, message, status=None):
+        super().__init__(message)
+        self.status = status
+
 
 class DuplicatePhoto(Exception):
     """The listing already contains this photo."""
@@ -59,7 +63,7 @@ def _object_url(*parts):
     return f"{current_app.config['SUPABASE_URL']}/storage/v1/{path}"
 
 
-def _storage_request(method, url, body=None, content_type=None):
+def _storage_request(method, url, body=None, content_type=None, max_bytes=None):
     key = current_app.config['SUPABASE_SERVICE_ROLE_KEY']
     headers = {'Authorization': f'Bearer {key}', 'apikey': key}
     if content_type:
@@ -67,12 +71,15 @@ def _storage_request(method, url, body=None, content_type=None):
     request = urllib.request.Request(url, data=body, method=method, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=STORAGE_TIMEOUT) as response:
-            return response.read()
+            data = response.read(max_bytes + 1) if max_bytes is not None else response.read()
+            if max_bytes is not None and len(data) > max_bytes:
+                raise ValueError('Photo is larger than 5 MB.')
+            return data
     except urllib.error.HTTPError as error:
         # Supabase explains the problem in the body (e.g. "Bucket not found"); the address shows
         # which project and bucket were asked. Neither contains the key.
         detail = error.read(300).decode('utf-8', 'replace')
-        raise StorageError(f"{error.code} from {method} {url}: {detail}") from error
+        raise StorageError(f"{error.code} from {method} {url}: {detail}", error.code) from error
     except (urllib.error.URLError, OSError) as error:
         raise StorageError(f"{error} ({method} {url})") from error
 
@@ -85,7 +92,7 @@ def photo_url(filename):
     return url_for('static', filename='property_pics/' + filename)
 
 
-def save_picture(file_storage, seen=None):
+def save_picture(file_storage, seen=None, filename=None):
     """Shrink an uploaded photo and store it as a JPEG under a random name.
 
     Returns the filename, or None if the upload isn't a readable image.
@@ -94,6 +101,8 @@ def save_picture(file_storage, seen=None):
     try:
         image = Image.open(file_storage.stream)
         if image.format not in ALLOWED_IMAGE_FORMATS:
+            return None
+        if image.width * image.height > 40_000_000:
             return None
         image = ImageOps.exif_transpose(image)  # respect phone camera rotation
         image.thumbnail((MAX_IMAGE_SIDE, MAX_IMAGE_SIDE))
@@ -113,7 +122,7 @@ def save_picture(file_storage, seen=None):
         if digest in seen:
             raise DuplicatePhoto()
         seen.add(digest)
-    filename = f"{secrets.token_hex(7)}.jpg"
+    filename = filename or f"{secrets.token_hex(7)}.jpg"
     if remote_storage():
         _storage_request('POST', _object_url('object', current_app.config['SUPABASE_STORAGE_BUCKET'], filename),
                          body=data, content_type='image/jpeg')

@@ -224,6 +224,19 @@ class PropertyPhoto(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
 
 
+class PhotoUpload(db.Model):
+    """Server-owned upload receipts; never exposed through the Supabase Data API."""
+    __tablename__ = 'photo_upload'
+    id = db.Column(db.String(32), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    # Scope, not a foreign key: deleting a listing must not lose its cleanup receipts.
+    listing_id = db.Column(db.Integer, nullable=True)
+    filename = db.Column(db.String(40), nullable=False, unique=True)
+    digest = db.Column(db.String(64), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow, index=True)
+    claimed = db.Column(db.Boolean, nullable=False, default=False)
+
+
 class PropertyAmenity(db.Model):
     __tablename__ = 'property_amenity'
     # The primary key finds a listing's amenities; this index finds listings with an amenity

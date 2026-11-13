@@ -119,6 +119,8 @@ class Config:
     SUPABASE_URL = os.environ.get('SUPABASE_URL', '').strip().rstrip('/')
     SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
     SUPABASE_STORAGE_BUCKET = os.environ.get('SUPABASE_STORAGE_BUCKET', 'property-photos').strip()
+    SUPABASE_UPLOAD_BUCKET = 'property-photo-uploads'
+    DIRECT_PHOTO_UPLOADS = _flag('DIRECT_PHOTO_UPLOADS', True)
     MAX_IMAGE_BYTES = MAX_IMAGE_BYTES
     MAX_PHOTOS = MAX_PHOTOS
     # A full set of photos in one request, plus room for the rest of the form
@@ -157,4 +159,5 @@ class Config:
         'reset_ip': (10, 60 * 60),
         'verify_resend': (3, 60 * 60),
         'report': (5, 60 * 60),
+        'photo_upload': (40, 60 * 60),
     }
