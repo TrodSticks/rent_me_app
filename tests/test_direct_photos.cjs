@@ -40,7 +40,12 @@ function browser({failUpload = false, saveError = false} = {}) {
         }
     }
     const context = {document: {getElementById: id => elements[id], createElement: () => progress},
-        window: {addEventListener() {}, location: {assign: url => {redirect = url;}}},
+        window: {addEventListener(name, fn) { listeners[name] = fn; }, location: {assign: url => {
+            let blocked = false;
+            listeners.beforeunload({preventDefault() { blocked = true; }});
+            assert.equal(blocked, false, 'successful save must not ask the user to leave the page');
+            redirect = url;
+        }}},
         FormData, XMLHttpRequest: XHR,
         fetch: async (url, options) => {
             calls.push([url, options]);

@@ -105,6 +105,7 @@
             progress.textContent = 'Photos checked. Saving your listing…';
             // Buttons named "action" shadow form.action with a RadioNodeList in real browsers.
             const result = await jsonRequest(form.getAttribute('action') || window.location.href, body, true);
+            busy = false; // Our own successful navigation must not trigger the leave-page warning.
             window.location.assign(result.redirect);
         } catch (error) {
             warning.textContent = error.message || 'Could not save. Check your connection and try again.';
