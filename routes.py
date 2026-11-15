@@ -470,13 +470,15 @@ def conversation(user_id):
         (Message.sender_id == current_user.id) & (Message.recipient_id == user_id),
         (Message.sender_id == user_id) & (Message.recipient_id == current_user.id),
     )
-    messages = Message.query.filter(between_users, Message.property_id == property_id) \
-        .order_by(Message.timestamp.asc(), Message.id.asc()).all()
-
     # Mark messages in this thread as read
     Message.query.filter_by(sender_id=user_id, recipient_id=current_user.id,
                             property_id=property_id, read=False).update({'read': True})
     db.session.commit()
+
+    # Commit expires loaded ORM objects. Fetch the history afterwards so rendering
+    # does not reload every message individually over the database connection.
+    messages = Message.query.filter(between_users, Message.property_id == property_id) \
+        .order_by(Message.timestamp.asc(), Message.id.asc()).all()
 
     return render_template("conversation.html", title=f"Chat with {other_user.username}", messages=messages,
                            other_user=other_user, property=property)

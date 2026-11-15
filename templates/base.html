@@ -20,7 +20,9 @@
 </head>
 <body>
     {% set here = request.endpoint %}
-    {% set unread_count = current_user.messages_received.filter_by(read=False).count() if current_user.is_authenticated else 0 %}
+    {% if unread_count is not defined %}
+        {% set unread_count = current_user.messages_received.filter_by(read=False).count() if current_user.is_authenticated else 0 %}
+    {% endif %}
     {% set is_landlord = current_user.is_authenticated and current_user.role == "Landlord" %}
     {% set messaging = here in ['main.inbox', 'main.conversation', 'main.send_message'] %}
 
