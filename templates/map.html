@@ -110,5 +110,5 @@
         'pinsUrl': url_for('main.map_pins_api'),
         'defaultPhoto': default_photo()
     }|tojson }}</script>
-    <script src="{{ url_for('static', filename='map.js') }}"></script>
+    <script src="{{ asset_url('map.js') }}"></script>
 {% endblock %}

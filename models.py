@@ -248,6 +248,7 @@ class PropertyAmenity(db.Model):
 
 class Message(db.Model):
     __table_args__ = (
+        db.UniqueConstraint('sender_id', 'client_token', name='uq_message_submission'),
         db.Index('ix_message_recipient_read', 'recipient_id', 'read'),   # unread count on every page
         db.Index('ix_message_sender', 'sender_id'),
         db.Index('ix_message_property', 'property_id'),
@@ -258,6 +259,7 @@ class Message(db.Model):
     recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     property_id = db.Column(db.Integer, db.ForeignKey('property.id'), nullable=True)
     content = db.Column(db.Text, nullable=False)
+    client_token = db.Column(db.String(36), nullable=True)
     timestamp = db.Column(db.DateTime, nullable=False, default=utcnow)
     read = db.Column(db.Boolean, default=False)
     property = db.relationship('Property', backref='messages')

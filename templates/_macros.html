@@ -5,7 +5,7 @@
 {%- endmacro %}
 
 {% macro default_photo() -%}
-    {{ url_for('static', filename='property_pics/default.jpg') }}
+    {{ asset_url('property_pics/default.jpg') }}
 {%- endmacro %}
 
 {% macro money(amount) -%}
@@ -26,7 +26,11 @@
 {% macro property_card(property, title_class='', favorited=None) %}
     <article class="property-card">
         <div class="rm-photo">
-            <img src="{{ photo_url(property) }}" alt="" loading="lazy" onerror="this.onerror=null;this.src='{{ default_photo() }}'">
+            <img src="{{ thumbnail_url(property.image_file) }}"
+                 srcset="{{ thumbnail_url(property.image_file, 320) }} 320w, {{ thumbnail_url(property.image_file, 640) }} 640w"
+                 sizes="(max-width: 575px) calc(100vw - 48px), (max-width: 991px) 45vw, 360px"
+                 alt="" loading="lazy" decoding="async" width="640" height="480"
+                 onerror="this.onerror=null;this.removeAttribute('srcset');this.src='{{ photo_url(property) }}'">
             <span class="rm-pill">
                 {%- if property.status == 'rented' %}Rented{% elif property.status == 'reserved' %}Reserved{% else %}{{ 'Flat' if property.property_type == 'flat' else 'House' }}{% endif -%}
             </span>

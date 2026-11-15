@@ -285,6 +285,6 @@
             <button type="button" class="rm-viewer-btn rm-viewer-next" id="viewer-next" aria-label="Next photo"><i class="fas fa-chevron-right"></i></button>
             <span class="rm-viewer-count" id="viewer-count" aria-live="polite"></span>
         </div>
-        <script src="{{ url_for('static', filename='gallery.js') }}"></script>
+        <script src="{{ asset_url('gallery.js') }}"></script>
     {% endif %}
 {% endblock %}

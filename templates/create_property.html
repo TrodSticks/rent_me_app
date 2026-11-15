@@ -173,7 +173,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script id="pin-data" type="application/json">{{ town_coords|tojson }}</script>
-    <script src="{{ url_for('static', filename='pin_picker.js') }}"></script>
-    <script src="{{ url_for('static', filename='photo_manager.js') }}"></script>
-    {% if direct_uploads %}<script src="{{ url_for('static', filename='direct_photos.js') }}"></script>{% endif %}
+    <script src="{{ asset_url('pin_picker.js') }}"></script>
+    <script src="{{ asset_url('photo_manager.js') }}"></script>
+    {% if direct_uploads %}<script src="{{ asset_url('direct_photos.js') }}"></script>{% endif %}
 {% endblock %}

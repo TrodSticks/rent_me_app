@@ -33,10 +33,11 @@
                     </div>
                 {% endif %}
 
-                <form method="POST" action=""><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <form method="POST" action="" data-new-message data-owner="{{ current_user.id }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="client_token" value="{{ message_token() }}">
                     <div class="mb-3">
                         <label for="content" class="form-label">Your message</label>
-                        <textarea class="form-control" id="content" name="content" rows="6" required
+                        <textarea class="form-control" id="content" name="content" maxlength="5000" rows="6" required
                                   placeholder="Hi {{ recipient.username }}, I would like to know more about..."></textarea>
                     </div>
 
@@ -66,6 +67,7 @@
         </div>
     </div>
 
+    <script src="{{ asset_url('chat.js') }}" defer></script>
     <script>
         const messageContext = {{ {'recipient': recipient.username, 'title': property.title if property else '', 'location': property.location if property else ''}|tojson }};
 

@@ -29,7 +29,7 @@
             <a class="rm-row message-item text-decoration-none text-reset {{ 'message-unread' if thread.unread > 0 else '' }}"
                href="{{ url_for('main.conversation', user_id=other_user.id, property_id=thread.property.id if thread.property else None) }}">
                 {% if thread.property %}
-                    <img class="rm-row-thumb" src="{{ photo_url(thread.property) }}" alt="" loading="lazy"
+                    <img class="rm-row-thumb" src="{{ thumbnail_url(thread.property.image_file, 320) }}" alt="" loading="lazy"
                          onerror="this.onerror=null;this.src='{{ default_photo() }}'">
                 {% else %}
                     <span class="rm-avatar lg">{{ other_user.username[0] }}</span>

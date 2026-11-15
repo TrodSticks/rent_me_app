@@ -1,11 +1,12 @@
 import math
 import os
+from uuid import UUID, uuid4
 from datetime import date
 from urllib.parse import urlparse
 from flask import render_template, url_for, flash, redirect, request, Blueprint, jsonify, current_app
 from flask_login import current_user, login_required
 from flask_wtf.csrf import CSRFError
-from sqlalchemy import and_, exists, func, or_, select
+from sqlalchemy import and_, case, exists, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 from app import db
@@ -37,7 +38,9 @@ SIMILAR_COUNT = 3
 
 @bp.app_context_processor
 def inject_shared_values():
+    from thumbnails import thumbnail_url
     return {
+        'thumbnail_url': thumbnail_url,
         'locations': LOCATIONS,
         'town_coords': TOWN_COORDS,
         'AMENITIES': AMENITIES,
@@ -46,6 +49,7 @@ def inject_shared_values():
         'filter_url': filter_url,
         'stored_photo_url': photo_url,
         'today': date.today(),
+        'message_token': lambda: str(uuid4()),
         # The development mailbox only exists on a developer's machine
         'dev_mailbox': current_app.config['MAIL_BACKEND'] == 'file',
     }
@@ -73,7 +77,7 @@ def not_found(e):
 @bp.app_errorhandler(CSRFError)
 def csrf_failed(e):
     if (request.path.startswith(('/favorite/', '/api/photo-uploads')) or
-            request.headers.get('X-Photo-Upload') == 'direct'):
+            request.headers.get('X-Photo-Upload') == 'direct' or wants_json()):
         return jsonify({"error": "Your session expired. Reload the page and try again."}), 400
     flash("That form expired or came from another site. Please try again.", "danger")
     return redirect(request.referrer if is_safe_redirect(request.referrer) else url_for("main.home"))
@@ -377,26 +381,68 @@ def thread_exists(user_a_id, user_b_id, property_id):
 
 
 def get_conversations(user):
-    """Group a user's sent and received messages into threads, one per (other user, property)."""
-    messages = Message.query.options(
-        joinedload(Message.sender), joinedload(Message.recipient), joinedload(Message.property)
-    ).filter(
-        or_(Message.sender_id == user.id, Message.recipient_id == user.id)
-    ).order_by(Message.timestamp.desc(), Message.id.desc()).all()
+    """Read one message per thread, with counts computed in the database."""
+    other = case((Message.sender_id == user.id, Message.recipient_id), else_=Message.sender_id)
+    partition = [other, Message.property_id]
+    ranked = db.session.query(
+        Message.id.label('id'),
+        func.row_number().over(partition_by=partition,
+            order_by=[Message.timestamp.desc(), Message.id.desc()]).label('position'),
+        func.count().over(partition_by=partition).label('total'),
+        func.sum(case((and_(Message.recipient_id == user.id, Message.read == False), 1),
+                      else_=0)).over(partition_by=partition).label('unread'),
+    ).filter(or_(Message.sender_id == user.id, Message.recipient_id == user.id)).subquery()
+    rows = Message.query.options(joinedload(Message.sender), joinedload(Message.recipient),
+                                 joinedload(Message.property)).join(ranked, Message.id == ranked.c.id) \
+        .filter(ranked.c.position == 1).add_columns(ranked.c.total, ranked.c.unread) \
+        .order_by(Message.timestamp.desc(), Message.id.desc()).all()
+    return [{'user': m.recipient if m.sender_id == user.id else m.sender,
+             'property': m.property, 'latest': m, 'unread': unread, 'count': total}
+            for m, total, unread in rows]
 
-    threads = {}
-    for message in messages:
-        other_user = message.recipient if message.sender_id == user.id else message.sender
-        key = (other_user.id, message.property_id)
-        if key not in threads:
-            # Messages are newest first, so the first one seen is the latest
-            threads[key] = {'user': other_user, 'property': message.property,
-                            'latest': message, 'unread': 0, 'count': 0}
-        thread = threads[key]
-        thread['count'] += 1
-        if message.recipient_id == user.id and not message.read:
-            thread['unread'] += 1
-    return list(threads.values())
+
+def wants_json():
+    return request.accept_mimetypes.best == 'application/json'
+
+
+def message_data(message, sender_id):
+    return {'id': message.id, 'content': message.content,
+            'timestamp': message.timestamp.isoformat() + 'Z',
+            'label': message.timestamp.strftime('%d %b, %H:%M'),
+            'read': bool(message.read), 'sent': message.sender_id == sender_id,
+            'client_token': message.client_token if message.sender_id == sender_id else None}
+
+
+def save_message_once(recipient_id, property_id, content):
+    """A unique database constraint also covers simultaneous retries on different workers."""
+    sender_id = current_user.id
+    token = request.form.get('client_token')
+    if token:
+        try:
+            token = str(UUID(token))
+        except (ValueError, AttributeError):
+            return None, 'This message could not be identified. Reload the page.', 400
+    elif wants_json():
+        return None, 'This message could not be identified. Reload the page.', 400
+    existing = Message.query.filter_by(sender_id=sender_id, client_token=token).first() if token else None
+    if existing is None:
+        message = Message(sender_id=sender_id, recipient_id=recipient_id, property_id=property_id,
+                          content=content[:5000], client_token=token)
+        db.session.add(message)
+        try:
+            db.session.flush()
+            result = message_data(message, sender_id)
+            db.session.commit()
+            return result, None, 200
+        except IntegrityError:
+            db.session.rollback()
+            existing = Message.query.filter_by(sender_id=sender_id, client_token=token).first() if token else None
+            if existing is None:
+                raise
+    if (existing.recipient_id != recipient_id or existing.property_id != property_id
+            or existing.content != content[:5000]):
+        return None, 'This submission was already used for a different message.', 409
+    return message_data(existing, sender_id), None, 200
 
 
 def _get_property_or_none(property_id):
@@ -412,6 +458,8 @@ def _get_property_or_none(property_id):
 def send_message(recipient_id):
     recipient = db.get_or_404(User, recipient_id)
     if recipient == current_user:
+        if wants_json():
+            return jsonify(error="You can't send a message to yourself."), 400
         flash("You can't send a message to yourself.", "danger")
         return redirect(url_for("main.inbox"))
     property = _get_property_or_none(request.args.get('property_id', type=int))
@@ -420,19 +468,31 @@ def send_message(recipient_id):
     # Starting a conversation needs a confirmed email; carrying one on does not
     if not thread_exists(current_user.id, recipient.id, property_id):
         if not current_user.email_verified:
+            if wants_json():
+                return jsonify(error='Confirm your email before starting a conversation.'), 403
             return verification_notice()
         if property and property.status == 'rented' and property.landlord_id != current_user.id:
+            if wants_json():
+                return jsonify(error="This property has been rented."), 403
             flash("This property has been rented, so it isn't taking new enquiries.", "warning")
             return redirect(url_for("main.property_detail", property_id=property.id))
 
     if request.method == "POST":
         content = request.form.get("content", "").strip()
         if not content:
+            if wants_json():
+                return jsonify(error="Your message can't be empty."), 400
             flash("Your message can't be empty.", "danger")
             return render_template("send_message.html", title="Send Message", recipient=recipient, property=property)
-        db.session.add(Message(sender=current_user, recipient=recipient, content=content[:5000],
-                               property_id=property_id))
-        db.session.commit()
+        result, error, status = save_message_once(recipient.id, property_id, content)
+        if error:
+            if wants_json():
+                return jsonify(error=error), status
+            flash(error, 'danger')
+            return redirect(request.url)
+        if wants_json():
+            return jsonify(message=result, redirect=url_for('main.conversation', user_id=recipient.id,
+                                                            property_id=property_id))
         flash("Your message has been sent!", "success")
         return redirect(url_for("main.conversation", user_id=recipient.id, property_id=property_id))
 
@@ -473,15 +533,30 @@ def conversation(user_id):
     # Mark messages in this thread as read
     Message.query.filter_by(sender_id=user_id, recipient_id=current_user.id,
                             property_id=property_id, read=False).update({'read': True})
+
+    # Materialize the response before commit expires ORM objects. The response is
+    # returned only after the read receipts commit successfully.
+    query = Message.query.filter(between_users, Message.property_id == property_id)
+    before = request.args.get('before', type=int)
+    after = request.args.get('after', type=int)
+    if before:
+        query = query.filter(Message.id < before)
+    if after is not None:
+        query = query.filter(Message.id > after)
+        messages = query.order_by(Message.id.asc()).limit(51).all()
+        more = len(messages) > 50
+        messages = messages[:50]
+    else:
+        messages = query.order_by(Message.id.desc()).limit(51).all()
+        more = len(messages) > 50
+        messages = list(reversed(messages[:50]))
+    if wants_json():
+        response = jsonify(messages=[message_data(m, current_user.id) for m in messages], more=more)
+    else:
+        response = render_template("conversation.html", title=f"Chat with {other_user.username}", messages=messages,
+                                   other_user=other_user, property=property, more=more)
     db.session.commit()
-
-    # Commit expires loaded ORM objects. Fetch the history afterwards so rendering
-    # does not reload every message individually over the database connection.
-    messages = Message.query.filter(between_users, Message.property_id == property_id) \
-        .order_by(Message.timestamp.asc(), Message.id.asc()).all()
-
-    return render_template("conversation.html", title=f"Chat with {other_user.username}", messages=messages,
-                           other_user=other_user, property=property)
+    return response
 
 @bp.route("/send_reply/<int:recipient_id>", methods=["POST"])
 @login_required
@@ -496,9 +571,13 @@ def send_reply(recipient_id):
         return redirect(url_for("main.send_message", recipient_id=recipient_id, property_id=property_id))
 
     if content and recipient != current_user:
-        db.session.add(Message(sender=current_user, recipient=recipient, content=content[:5000],
-                               property_id=property_id))
-        db.session.commit()
+        result, error, status = save_message_once(recipient_id, property_id, content)
+        if wants_json():
+            return (jsonify(error=error), status) if error else jsonify(message=result)
+        if error:
+            flash(error, 'danger')
+    elif wants_json():
+        return jsonify(error="Please enter a message to someone else."), 400
 
     return redirect(url_for("main.conversation", user_id=recipient_id, property_id=property_id))
 
@@ -508,3 +587,4 @@ import listings   # noqa: E402,F401  property pages, the landlord dashboard and 
 import accounts   # noqa: E402,F401  sign-up, sign-in, email verification and password recovery
 import admin      # noqa: E402,F401  moderation and landlord verification
 import photo_uploads  # noqa: E402,F401  scoped direct-to-storage uploads
+import thumbnails  # noqa: E402,F401  public, cached listing previews

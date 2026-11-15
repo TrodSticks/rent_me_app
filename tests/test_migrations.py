@@ -8,7 +8,7 @@ from config import Config
 from locations import approximate_position
 
 PREVIOUS = '0002_property_coordinates'
-HEAD = '0005_photo_uploads'
+HEAD = '0006_message_submission'
 
 
 @pytest.fixture

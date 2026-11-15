@@ -23,15 +23,16 @@
         </div>
 
         <!-- Messages -->
-        <div class="chat-container">
+        <div class="chat-container" id="chat-history" data-url="{{ url_for('main.conversation', user_id=other_user.id, property_id=property.id if property else None) }}">
+            {% if more %}<button type="button" id="older-messages" class="btn btn-light mb-3">Load older messages</button>{% endif %}
             {% if messages %}
                 {% for message in messages %}
-                    <div class="message-bubble {{ 'sent' if message.sender == current_user else 'received' }}">
+                    <div data-message-id="{{ message.id }}" class="message-bubble {{ 'sent' if message.sender_id == current_user.id else 'received' }}">
                         <div class="message-text">{{ message.content }}</div>
                         <div class="message-meta">
                             <small class="text-muted">
                                 {{ message.timestamp.strftime('%d %b, %H:%M') }}
-                                {% if message.sender == current_user %}
+                                {% if message.sender_id == current_user.id %}
                                     <i class="fas fa-check{{ '-double' if message.read }} ms-1" title="{{ 'Read' if message.read else 'Sent' }}"></i>
                                 {% endif %}
                             </small>
@@ -49,16 +50,19 @@
 
         <!-- Reply -->
         <div class="card-footer">
-            <form method="POST" action="{{ url_for('main.send_reply', recipient_id=other_user.id) }}" class="d-flex gap-2 align-items-end"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <form id="chat-form" data-owner="{{ current_user.id }}" method="POST" action="{{ url_for('main.send_reply', recipient_id=other_user.id) }}" class="d-flex gap-2 align-items-end"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="client_token" value="{{ message_token() }}">
                 {% if property %}<input type="hidden" name="property_id" value="{{ property.id }}">{% endif %}
-                <textarea class="form-control" name="content" rows="1" placeholder="Type your message..."
+                <textarea class="form-control" name="content" maxlength="5000" rows="1" placeholder="Type your message..."
                           aria-label="Your message" required style="resize: none;"></textarea>
                 <button type="submit" class="rm-square-btn blue flex-shrink-0" style="height: 48px; min-width: 48px; border-radius: 14px;" aria-label="Send">
                     <i class="fas fa-paper-plane"></i>
                 </button>
             </form>
+            <p id="chat-status" role="status" aria-live="polite" class="small mb-0 mt-2"></p>
         </div>
     </div>
+    <script src="{{ asset_url('chat.js') }}" defer></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {

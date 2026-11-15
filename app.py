@@ -81,6 +81,8 @@ def create_app():
     db.init_app(app)
     login_manager.init_app(app)
     csrf.init_app(app)
+    from web_assets import install_assets
+    install_assets(app)
     # render_as_batch lets SQLite change existing tables
     migrate.init_app(app, db, directory=os.path.join(BASE_DIR, 'migrations'), render_as_batch=True)
 

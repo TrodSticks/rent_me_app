@@ -35,7 +35,7 @@
     {% if properties %}
         {% for property in properties %}
             <div class="rm-row">
-                <img class="rm-row-thumb" src="{{ photo_url(property) }}" alt="" loading="lazy"
+                <img class="rm-row-thumb" src="{{ thumbnail_url(property.image_file, 320) }}" alt="" loading="lazy"
                      onerror="this.onerror=null;this.src='{{ default_photo() }}'">
                 <div class="rm-row-main">
                     <h3><a href="{{ url_for('main.property_detail', property_id=property.id) }}">{{ property.title }}</a></h3>
